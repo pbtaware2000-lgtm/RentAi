@@ -1,0 +1,1 @@
+"""RentAI Streamlit frontend package."""

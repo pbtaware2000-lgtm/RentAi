@@ -1,0 +1,1 @@
+"""Property schemas; implementation is planned for Phase 3."""
