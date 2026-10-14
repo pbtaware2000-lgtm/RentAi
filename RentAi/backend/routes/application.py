@@ -1,0 +1,197 @@
+"""Authenticated routes for Firebase-backed application records."""
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+import logging
+
+logger = logging.getLogger(__name__)
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
+from backend.auth.dependencies import CurrentUser, get_current_user, require_roles
+from backend.core.firebase import (
+    FirebaseConfigurationError,
+)
+from backend.schemas.application_schemas import (
+    ApplicationRecordCreate,
+    ApplicationRecordResponse,
+    AuthenticatedUserResponse,
+    BrokerAssignmentRequest,
+    RoleGrantRequest,
+    PublicRegistrationRequest,
+)
+from backend.services.application_service import ApplicationService
+
+router = APIRouter(prefix="/application/records", tags=["application"])
+auth_router = APIRouter(prefix="/application/auth", tags=["application-auth"])
+admin_router = APIRouter(prefix="/application/admin", tags=["application-admin"])
+bearer_scheme = HTTPBearer(auto_error=False)
+
+
+@auth_router.get("/me", response_model=AuthenticatedUserResponse)
+def current_account(user: CurrentUser = Depends(get_current_user)):
+    return {
+        "uid": user.uid,
+        "role": user.role,
+        "name": user.claims.get("name"),
+        "email": user.claims.get("email"),
+    }
+
+
+@auth_router.post("/register", status_code=201, response_model=AuthenticatedUserResponse)
+def register_account(
+    payload: PublicRegistrationRequest,
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+):
+    if credentials is None or not credentials.credentials:
+        raise HTTPException(status_code=401, detail="Bearer token required")
+    try:
+        return ApplicationService().register_user_role(credentials.credentials, payload.role)
+    except PermissionError as exc:
+        raise HTTPException(status_code=409, detail="An account role is already assigned") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail="Invalid or revoked token") from exc
+    except FirebaseConfigurationError as exc:
+        raise HTTPException(status_code=503, detail="Authentication service unavailable") from exc
+    except Exception:
+        logger.exception("Public account role provisioning failed")
+        raise HTTPException(status_code=503, detail="Account registration service unavailable") from None
+
+
+@auth_router.get("/records")
+def list_account_records(
+    kind: str | None = Query(default=None, pattern="^(listing|profile|favorite|inquiry|maintenance)$"),
+    user: CurrentUser = Depends(get_current_user),
+):
+    try:
+        return {"records": ApplicationService().list_records_for_user(user, kind)}
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail="Application storage unavailable") from exc
+
+
+@auth_router.get("/listing-images")
+def list_visible_listing_images(user: CurrentUser = Depends(get_current_user)):
+    try:
+        return {"images": ApplicationService().list_listing_images_for_user(user)}
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail="Application storage unavailable") from exc
+
+
+@admin_router.get("/users")
+def list_registered_users(user: CurrentUser = Depends(require_roles("admin"))):
+    try:
+        return {"users": ApplicationService().list_users(user)}
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail="Application storage unavailable") from exc
+
+
+@router.post("", response_model=ApplicationRecordResponse, status_code=201)
+def create_record(payload: ApplicationRecordCreate, user: CurrentUser = Depends(get_current_user)):
+    try:
+        return ApplicationService().create_record(user, payload.kind, payload.data)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail="Application storage unavailable") from exc
+
+
+@router.get("/{record_id}", response_model=ApplicationRecordResponse)
+def get_record(record_id: str, user: CurrentUser = Depends(get_current_user)):
+    try:
+        return ApplicationService().get_record(user, record_id)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail="Application storage unavailable") from exc
+
+
+@router.put("/{record_id}", response_model=ApplicationRecordResponse)
+def update_record(record_id: str, payload: ApplicationRecordCreate, user: CurrentUser = Depends(get_current_user)):
+    try:
+        service = ApplicationService()
+        record = service.get_record(user, record_id)
+        if record.get("kind") != payload.kind:
+            raise HTTPException(status_code=400, detail="Record kind cannot be changed")
+        return service.update_record(user, record_id, payload.data)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail="Application storage unavailable") from exc
+
+
+@router.delete("/{record_id}", status_code=204)
+def delete_record(record_id: str, user: CurrentUser = Depends(get_current_user)):
+    try:
+        ApplicationService().delete_record(user, record_id)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail="Application storage unavailable") from exc
+
+
+@router.post("/{record_id}/broker-assignment", response_model=ApplicationRecordResponse)
+def assign_broker(
+    record_id: str,
+    payload: BrokerAssignmentRequest,
+    user: CurrentUser = Depends(require_roles("admin")),
+):
+    try:
+        return ApplicationService().assign_broker(user, record_id, payload.broker_uid)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail="Application storage unavailable") from exc
+
+
+@admin_router.put("/users/{uid}/role", status_code=204)
+def provision_user_role(
+    uid: str,
+    payload: RoleGrantRequest,
+    user: CurrentUser = Depends(require_roles("admin")),
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+):
+    if credentials is None or not credentials.credentials:
+        raise HTTPException(status_code=401, detail="Bearer token required")
+    try:
+        ApplicationService().provision_user_role(
+            user, credentials.credentials, uid, payload.role
+        )
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail="Trusted Admin authorization is required") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Role provisioning request is invalid") from exc
+    except FirebaseConfigurationError as exc:
+        raise HTTPException(status_code=503, detail="Authentication service unavailable") from exc
+
+
+
+@admin_router.post("/bootstrap", status_code=204)
+def bootstrap_admin(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+):
+    """Provision only a UID explicitly configured by the deployment operator."""
+    if credentials is None or not credentials.credentials:
+        raise HTTPException(
+            status_code=401,
+            detail="Bearer token required",
+        )
+
+    try:
+        ApplicationService().bootstrap_first_admin(
+            credentials.credentials
+        )
+
+    except PermissionError as exc:
+        raise HTTPException(
+            status_code=403,
+            detail=str(exc),
+        ) from exc
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or revoked token",
+        ) from exc
+
+    except FirebaseConfigurationError as exc:
+        logger.exception("Firebase configuration error during Admin bootstrap")
+        raise HTTPException(
+            status_code=503,
+            detail="Authentication service unavailable",
+        ) from exc
+
+    except Exception:
+        logger.exception("Unexpected error during Admin bootstrap")
+        raise HTTPException(
+            status_code=503,
+            detail="Authentication service unavailable",
+        ) from None
+

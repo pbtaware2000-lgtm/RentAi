@@ -1,0 +1,1 @@
+"""SHAP explanation utilities; implementation is planned for later phases."""
