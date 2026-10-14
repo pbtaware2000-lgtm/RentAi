@@ -1,0 +1,47 @@
+.st-key-insights-page {
+	gap: 0.55rem;
+}
+
+.st-key-insights-page [data-testid="stVerticalBlock"] {
+	gap: 0.55rem;
+}
+
+.st-key-insights-page [data-testid="stHorizontalBlock"] {
+	align-items: stretch;
+	gap: 1rem;
+}
+
+.st-key-insights-page [data-testid="stVerticalBlockBorderWrapper"] {
+	padding: 0.7rem 0.8rem;
+	border-radius: 10px;
+}
+
+.st-key-insights-page [data-testid="stCaptionContainer"] {
+	margin-top: 0.05rem;
+	margin-bottom: 0.05rem;
+}
+
+.st-key-insights-page [data-testid="stDataFrame"] {
+	margin-top: 0.05rem;
+	margin-bottom: 0.05rem;
+}
+
+.st-key-insights-page [data-testid="stSelectbox"] {
+	margin-bottom: 0;
+}
+
+.st-key-insights-page .st-key-insights-regression-card,
+.st-key-insights-page .st-key-insights-classification-card {
+	min-height: 0;
+	padding: 0.65rem 0.75rem;
+}
+
+@media (max-width: 850px) {
+	.st-key-insights-page [data-testid="stHorizontalBlock"] {
+		gap: 0.65rem;
+	}
+
+	.st-key-insights-page [data-testid="stVerticalBlockBorderWrapper"] {
+		padding: 0.6rem;
+	}
+}

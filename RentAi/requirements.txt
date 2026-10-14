@@ -1,0 +1,14 @@
+streamlit
+fastapi
+uvicorn[standard]
+pandas
+numpy
+xgboost
+matplotlib
+seaborn
+plotly
+firebase-admin
+python-dotenv
+cloudinary
+python-multipart
+Pillow
