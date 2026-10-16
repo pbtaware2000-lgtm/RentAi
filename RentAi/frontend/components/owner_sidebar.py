@@ -13,7 +13,6 @@ OWNER_MENU = (
     ("Revenue & Rent Collection", "₹"),
     ("Maintenance Requests", "⚒"),
     ("My Profile", "◉"),
-    ("Settings", "⚙"),
 )
 
 

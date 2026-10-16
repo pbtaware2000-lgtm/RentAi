@@ -9,9 +9,11 @@ from backend.routes.classification import router as classification_router
 from backend.routes.clustering import router as clustering_router
 from backend.routes.application import admin_router as application_admin_router
 from backend.routes.application import auth_router as application_auth_router
+from backend.routes.application import payments_router as application_payments_router
 from backend.routes.application import router as application_router
 from backend.routes.images import router as images_router
 from backend.routes.prediction import router as prediction_router
+from backend.repositories.sqlite_repository import initialize_database
 
 from backend.services.property_service import (
     count_matching_properties,
@@ -24,6 +26,7 @@ from backend.services.property_service import (
 
 @asynccontextmanager
 async def lifespan(_app):
+    initialize_database()
     issues = startup_configuration_issues()
     if issues:
         logging.getLogger(__name__).warning(
@@ -43,6 +46,7 @@ app.include_router(prediction_router)
 app.include_router(classification_router)
 app.include_router(clustering_router)
 app.include_router(application_router)
+app.include_router(application_payments_router)
 app.include_router(application_admin_router)
 app.include_router(application_auth_router)
 app.include_router(images_router)

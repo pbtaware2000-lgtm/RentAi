@@ -15,12 +15,15 @@ from backend.schemas.application_schemas import (
     BrokerAssignmentRequest,
     RoleGrantRequest,
     PublicRegistrationRequest,
+    RazorpayPaymentVerificationRequest,
 )
 from backend.services.application_service import ApplicationService
+from backend.services.razorpay_service import RazorpayRentService
 
 router = APIRouter(prefix="/application/records", tags=["application"])
 auth_router = APIRouter(prefix="/application/auth", tags=["application-auth"])
 admin_router = APIRouter(prefix="/application/admin", tags=["application-admin"])
+payments_router = APIRouter(prefix="/application/payments/razorpay", tags=["rent-payments"])
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
@@ -75,7 +78,7 @@ def sign_up_account(payload: dict):
 
 @auth_router.get("/records")
 def list_account_records(
-    kind: str | None = Query(default=None, pattern="^(listing|profile|favorite|inquiry|maintenance)$"),
+    kind: str | None = Query(default=None, pattern="^(listing|profile|favorite|inquiry|maintenance|tenancy|rent_payment)$"),
     user: CurrentUser = Depends(get_current_user),
 ):
     try:
@@ -84,10 +87,42 @@ def list_account_records(
         raise HTTPException(status_code=503, detail="Application storage unavailable") from exc
 
 
+@payments_router.post("/rent/{rent_record_id}/order")
+def create_rent_order(rent_record_id: str, user: CurrentUser = Depends(get_current_user)):
+    try:
+        return RazorpayRentService().create_order(user, rent_record_id)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail="Razorpay rent payments are temporarily unavailable") from exc
+
+
+@payments_router.post("/verify")
+def verify_rent_payment(
+    payload: RazorpayPaymentVerificationRequest,
+    user: CurrentUser = Depends(get_current_user),
+):
+    try:
+        return RazorpayRentService().verify_payment(
+            user,
+            payment_id=payload.razorpay_payment_id,
+            order_id=payload.razorpay_order_id,
+            signature=payload.razorpay_signature,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail="Razorpay rent verification is temporarily unavailable") from exc
+
+
 @auth_router.get("/listing-images")
 def list_visible_listing_images(user: CurrentUser = Depends(get_current_user)):
     try:
         return {"images": ApplicationService().list_listing_images_for_user(user)}
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail="Application storage unavailable") from exc
+
+
+@auth_router.get("/profile-images")
+def list_visible_profile_images(user: CurrentUser = Depends(get_current_user)):
+    try:
+        return {"images": ApplicationService().list_profile_images_for_user(user)}
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail="Application storage unavailable") from exc
 

@@ -10,6 +10,7 @@ RENTER_MENU = (
     ("Compare Properties", "⇄"),
     ("Saved Properties", "♡"),
     ("My Enquiries", "✉"),
+    ("Pay Rent", "₹"),
     ("My Profile", "◉"),
     ("Settings", "⚙"),
 )

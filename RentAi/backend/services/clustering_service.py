@@ -21,28 +21,24 @@ CATEGORICAL_WEIGHTS = {
 }
 
 
-def find_similar_properties(property_id: str, limit: int = 5) -> list[dict] | None:
-    """Return the closest dataset listings, excluding the reference listing."""
-    dataset = load_properties()
+def _required_dataset(dataset):
     required = {"property_id", *NUMERIC_FEATURES, *CATEGORICAL_WEIGHTS}
     missing_columns = required.difference(dataset.columns)
     if missing_columns:
         raise ValueError(f"Similarity dataset is missing columns: {sorted(missing_columns)}")
+    return dataset
 
-    matches = dataset.index[dataset["property_id"] == property_id]
-    if len(matches) == 0:
-        return None
 
-    reference_index = matches[0]
-    reference = dataset.loc[reference_index]
-    candidates = dataset.drop(index=reference_index).copy()
+def _nearest_properties(dataset, reference: dict, limit: int, exclude_index=None) -> list[dict]:
+    candidates = dataset.drop(index=exclude_index).copy() if exclude_index is not None else dataset.copy()
     if candidates.empty:
         return []
 
     numeric_values = dataset.loc[:, NUMERIC_FEATURES].astype(float)
     ranges = numeric_values.max() - numeric_values.min()
     ranges = ranges.mask(ranges == 0, 1.0)
-    differences = (candidates.loc[:, NUMERIC_FEATURES].astype(float) - reference.loc[list(NUMERIC_FEATURES)].astype(float)) / ranges
+    reference_values = np.array([reference[name] for name in NUMERIC_FEATURES], dtype=float)
+    differences = (candidates.loc[:, NUMERIC_FEATURES].astype(float) - reference_values) / ranges
     distances = np.square(differences.to_numpy()).sum(axis=1)
 
     for column, weight in CATEGORICAL_WEIGHTS.items():
@@ -50,3 +46,26 @@ def find_similar_properties(property_id: str, limit: int = 5) -> list[dict] | No
 
     candidates["_similarity_distance"] = distances
     return candidates.sort_values("_similarity_distance", kind="stable").head(limit).drop(columns="_similarity_distance").to_dict(orient="records")
+
+
+def find_similar_properties(property_id: str, limit: int = 5) -> list[dict] | None:
+    """Return the closest dataset listings, excluding the reference listing."""
+    dataset = _required_dataset(load_properties())
+
+    matches = dataset.index[dataset["property_id"] == property_id]
+    if len(matches) == 0:
+        return None
+
+    reference_index = matches[0]
+    reference = dataset.loc[reference_index].to_dict()
+    return _nearest_properties(dataset, reference, limit, exclude_index=reference_index)
+
+
+def find_similar_properties_for_features(features: dict, limit: int = 5) -> list[dict]:
+    """Rank CSV properties against an unsaved property feature profile."""
+    dataset = _required_dataset(load_properties())
+    required = {"city", "locality", "property_type", "furnishing_status", *NUMERIC_FEATURES}
+    missing_features = required.difference(features)
+    if missing_features:
+        raise ValueError(f"Similarity features are missing: {sorted(missing_features)}")
+    return _nearest_properties(dataset, features, limit)

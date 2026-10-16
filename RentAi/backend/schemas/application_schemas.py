@@ -17,6 +17,12 @@ class ApplicationRecordResponse(BaseModel):
     data: dict[str, Any]
 
 
+class RazorpayPaymentVerificationRequest(BaseModel):
+    razorpay_payment_id: str = Field(min_length=1, max_length=80)
+    razorpay_order_id: str = Field(min_length=1, max_length=80)
+    razorpay_signature: str = Field(min_length=1, max_length=128)
+
+
 class ImageMetadataRequest(BaseModel):
     url: HttpUrl
     public_id: str = Field(min_length=1)

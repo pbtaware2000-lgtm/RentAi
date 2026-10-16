@@ -17,7 +17,7 @@ def _report_text(data: pd.DataFrame) -> str:
 		f"Dataset columns: {len(data.columns):,}",
 		f"Duplicate rows: {int(data.duplicated().sum()):,}" if not data.empty else "Duplicate rows: 0",
 		f"Missing values: {int(data.isna().sum().sum()):,}" if not data.empty else "Missing values: 0",
-		"ML status: Not connected",
+		"ML APIs: Prediction, classification, and clustering routes are registered; runtime health is not sampled here.",
 		"Dataset storage: CSV; account roles and application records: SQLite",
 	]
 	rents = numeric_column(data, "rent")
@@ -39,7 +39,7 @@ def render(data: pd.DataFrame) -> None:
 			st.subheader("System status")
 			st.markdown("**Streamlit UI** · Available")
 			st.markdown("**Dataset** · " + ("Loaded" if not data.empty else "Empty or unavailable"))
-			st.markdown("**ML services** · Not connected")
+			st.markdown("**ML services** · Prediction, classification, and clustering routes are implemented; runtime health is not sampled here")
 			st.markdown("**Application records** · SQLite-backed")
 	with report_col:
 		with st.container(border=True):

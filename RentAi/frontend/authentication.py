@@ -35,24 +35,44 @@ def _request(path,payload=None,token=None):
     try:
         with urlopen(req,timeout=12) as response: return json.loads(response.read().decode())
     except HTTPError as exc:
-        try: detail=json.loads(exc.read().decode()).get("detail")
-        except Exception: detail=None
-        raise AuthenticationError(detail or ("Email or password is incorrect." if exc.code==401 else "RentAI authentication service is unavailable.")) from None
+        try:
+            payload=json.loads(exc.read().decode())
+            detail=payload.get("detail") if isinstance(payload,dict) else None
+        except (UnicodeDecodeError,json.JSONDecodeError,OSError): detail=None
+        message=detail.strip() if isinstance(detail,str) and detail.strip() else None
+        if exc.code==401 and message is None: message="Email or password is incorrect."
+        raise AuthenticationError(message or "RentAI authentication service is unavailable.") from None
     except (URLError,TimeoutError,OSError): raise AuthenticationError("Could not reach RentAI. Check that the API is running.") from None
+    except (UnicodeDecodeError,json.JSONDecodeError): raise AuthenticationError("RentAI returned an invalid response.") from None
 
 def password_sign_in(email,password):
     if not password: raise AuthenticationError("Enter your email and password.")
-    return _request("/application/auth/sign-in",{"email":normalize_email(email),"password":password})
+    tokens=_request("/application/auth/sign-in",{"email":normalize_email(email),"password":password})
+    if not isinstance(tokens,dict) or not isinstance(tokens.get("id_token"),str) or not tokens["id_token"].strip() or not isinstance(tokens.get("refresh_token"),str) or not tokens["refresh_token"].strip():
+        raise AuthenticationError("RentAI returned an invalid authentication response.")
+    return tokens
 def password_sign_up(email,password,display_name,role="renter"):
     if len(password)<8: raise AuthenticationError("Choose a password with at least 8 characters.")
     return _request("/application/auth/sign-up",{"email":normalize_email(email),"password":password,"name":display_name,"role":role})
 def provision_public_role(id_token,role): return {"role":role}
 def fetch_verified_user(id_token): return _request("/application/auth/me",token=id_token)
+
+def _clear_owner_profile_state(session):
+    """Discard profile widget/cache state when the authenticated session changes."""
+    for key in list(session):
+        if str(key).startswith("owner_profile_"):
+            session.pop(key, None)
+
 def save_session(session,tokens,user):
+    # Streamlit keeps keyed widget values across logout/login. Clear the cached
+    # profile form so its values are initialized from the newly authenticated
+    # Owner's API record, even when the same Owner signs in again.
+    _clear_owner_profile_state(session)
     session["rentai_id_token"]=tokens["id_token"]; session["rentai_refresh_token"]=tokens["refresh_token"]
     session["rentai_expires_at"]=tokens.get("expires_in",2592000)+__import__("time").time()
     session["rentai_uid"]=user["uid"]; session["rentai_role"]=user["role"]; session["rentai_display_name"]=user.get("name",""); session["rentai_email"]=user.get("email","")
 def clear_auth_session(session,*,clear_login_inputs=False,reset_page=True):
+    _clear_owner_profile_state(session)
     for key in AUTH_STATE_KEYS: session.pop(key,None)
     if clear_login_inputs:
         for key in LOGIN_INPUT_KEYS: session.pop(key,None)

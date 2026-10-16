@@ -31,8 +31,12 @@ def render(_data) -> None:
     st.dataframe(pd.DataFrame([r.get("data", {}) for r in inquiries]), use_container_width=True, hide_index=True)
     selected = st.selectbox("Manage enquiry", inquiries, format_func=lambda r: (r.get("data") or {}).get("client_name") or (r.get("data") or {}).get("message", "Enquiry")[:70])
     data = selected.get("data") or {}
+    broker_statuses = ["new", "contacted", "viewing_scheduled", "completed", "closed"]
+    current_status = data.get("status", "new")
+    if current_status not in broker_statuses:
+        current_status = "new"
     with st.form("broker_update_enquiry"):
-        status = st.selectbox("Status", ["new", "contacted", "viewing_scheduled", "completed", "closed"], index=["new", "contacted", "viewing_scheduled", "completed", "closed"].index(data.get("status", "new")))
+        status = st.selectbox("Status", broker_statuses, index=broker_statuses.index(current_status))
         note = st.text_area("Broker note", value=data.get("broker_note", ""))
         submitted = st.form_submit_button("Update enquiry")
     if submitted:

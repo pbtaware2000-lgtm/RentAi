@@ -11,6 +11,8 @@ def load_owner_records() -> dict[str, list[dict]]:
         "listings": records("listing"),
         "enquiries": records("inquiry"),
         "maintenance": records("maintenance"),
+        "tenancies": records("tenancy"),
+        "rent_payments": records("rent_payment"),
         "profiles": records("profile"),
     }
 
@@ -36,4 +38,4 @@ def rows(records: list[dict]) -> pd.DataFrame:
 
 def money(value: object) -> str:
     amount = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
-    return f"₹{amount:,.0f}" if pd.notna(amount) else "Not tracked yet"
+    return f"\u20b9{amount:,.0f}" if pd.notna(amount) else "Not tracked yet"

@@ -53,7 +53,6 @@ OWNER_SECTION_RENDERERS = {
     "Revenue & Rent Collection": owner_sections.render_revenue,
     "Maintenance Requests": owner_sections.render_maintenance,
     "My Profile": owner_sections.render_profile,
-    "Settings": owner_sections.render_settings,
 }
 
 RENTER_SECTION_RENDERERS = {
@@ -63,6 +62,7 @@ RENTER_SECTION_RENDERERS = {
     "Compare Properties": renter_workspace.render_compare,
     "Saved Properties": renter_workspace.render_saved,
     "My Enquiries": renter_workspace.render_enquiries,
+    "Pay Rent": renter_workspace.render_rent_payments,
     "My Profile": renter_workspace.render_profile,
     "Settings": renter_workspace.render_settings,
 }

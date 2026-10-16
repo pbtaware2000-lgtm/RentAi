@@ -4,7 +4,7 @@ import hmac
 import re
 import secrets
 
-from backend.repositories.sqlite_repository import SQLiteRepository
+from backend.repositories.sqlite_repository import SQLiteRepository, initialize_database
 
 
 class AuthenticationServiceError(RuntimeError): pass
@@ -43,6 +43,7 @@ def create_first_admin_account(email, password, name):
     if not isinstance(password, str) or len(password) < 8:
         raise ValueError("Choose a password with at least 8 characters")
     try:
+        initialize_database()
         return SQLiteRepository().create_first_admin_account(
             email.strip(), name.strip(), _password_hash(password)
         )
