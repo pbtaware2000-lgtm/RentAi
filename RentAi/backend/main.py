@@ -27,7 +27,7 @@ async def lifespan(_app):
     issues = startup_configuration_issues()
     if issues:
         logging.getLogger(__name__).warning(
-            "Firebase authentication configuration needs attention; fields=%s",
+            "RentAI configuration needs attention; fields=%s",
             ",".join(issues),
         )
     yield

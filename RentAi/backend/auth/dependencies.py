@@ -1,4 +1,4 @@
-"""FastAPI dependencies for verified Firebase identities and role checks."""
+"""FastAPI dependencies for verified SQLite sessions and role checks."""
 
 from dataclasses import dataclass
 from typing import Annotated
@@ -6,8 +6,8 @@ from typing import Annotated
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from backend.core.firebase import FirebaseConfigurationError, verify_id_token
-from backend.repositories.firestore_repository import FirestoreRepository
+from backend.core.auth import verify_session
+from backend.repositories.sqlite_repository import SQLiteRepository
 
 
 VALID_ROLES = {"owner", "renter", "broker", "admin"}
@@ -27,16 +27,14 @@ def get_current_user(
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise HTTPException(status_code=401, detail="Bearer token required")
     try:
-        claims = verify_id_token(credentials.credentials)
-    except FirebaseConfigurationError as exc:
-        raise HTTPException(status_code=503, detail="Authentication service unavailable") from exc
+        claims = verify_session(credentials.credentials)
     except ValueError as exc:
         raise HTTPException(status_code=401, detail="Invalid or revoked token") from exc
     uid = claims.get("uid")
     if not uid:
         raise HTTPException(status_code=403, detail="Verified account has no user identity")
     try:
-        role = FirestoreRepository().get_user_role(uid)
+        role = SQLiteRepository().get_user_role(uid)
     except Exception as exc:
         raise HTTPException(status_code=503, detail="Authorization service unavailable") from exc
     if role not in VALID_ROLES:

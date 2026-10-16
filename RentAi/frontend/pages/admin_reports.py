@@ -18,7 +18,7 @@ def _report_text(data: pd.DataFrame) -> str:
 		f"Duplicate rows: {int(data.duplicated().sum()):,}" if not data.empty else "Duplicate rows: 0",
 		f"Missing values: {int(data.isna().sum().sum()):,}" if not data.empty else "Missing values: 0",
 		"ML status: Not connected",
-		"Dataset storage: CSV; account roles and application records: Firestore",
+		"Dataset storage: CSV; account roles and application records: SQLite",
 	]
 	rents = numeric_column(data, "rent")
 	lines.append(f"Average rent: {rents.mean():,.2f}" if not rents.empty else "Average rent: unavailable")
@@ -40,7 +40,7 @@ def render(data: pd.DataFrame) -> None:
 			st.markdown("**Streamlit UI** · Available")
 			st.markdown("**Dataset** · " + ("Loaded" if not data.empty else "Empty or unavailable"))
 			st.markdown("**ML services** · Not connected")
-			st.markdown("**Application records** · Firestore-backed")
+			st.markdown("**Application records** · SQLite-backed")
 	with report_col:
 		with st.container(border=True):
 			st.subheader("Report generation")

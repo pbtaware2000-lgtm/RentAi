@@ -1,4 +1,4 @@
-"""HTTP schemas for Firebase-backed application records and images."""
+"""HTTP schemas for application records and images."""
 
 from typing import Any
 

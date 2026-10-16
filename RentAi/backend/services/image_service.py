@@ -1,4 +1,4 @@
-"""Cloudinary upload orchestration and Firestore metadata persistence."""
+"""Cloudinary upload orchestration and SQLite metadata persistence."""
 
 import io
 import logging
@@ -7,7 +7,7 @@ import os
 from fastapi import HTTPException
 
 from backend.auth.dependencies import CurrentUser
-from backend.repositories.firestore_repository import FirestoreRepository
+from backend.repositories.sqlite_repository import SQLiteRepository
 
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
 MAX_IMAGE_DIMENSION = 8_000
@@ -17,8 +17,8 @@ logger = logging.getLogger(__name__)
 
 
 class ImageService:
-    def __init__(self, repository: FirestoreRepository | None = None):
-        self.repository = repository or FirestoreRepository()
+    def __init__(self, repository: SQLiteRepository | None = None):
+        self.repository = repository or SQLiteRepository()
 
     def upload(self, user: CurrentUser, record_id: str, image_bytes: bytes, filename: str) -> dict:
         record = self.repository.get("application_records", record_id)

@@ -5,13 +5,12 @@ import math
 from datetime import date, datetime, timezone
 
 from backend.auth.dependencies import CurrentUser
-from backend.core.firebase import (
-    bootstrap_first_admin as firebase_bootstrap_first_admin,
+from backend.core.auth import (
     get_trusted_user_role,
     grant_role_to_user,
-    register_user_role as firebase_register_user_role,
+    register_user_role as sqlite_register_user_role,
 )
-from backend.repositories.firestore_repository import FirestoreRepository
+from backend.repositories.sqlite_repository import SQLiteRepository
 
 
 ROLE_OPERATIONS = {
@@ -23,14 +22,11 @@ ROLE_OPERATIONS = {
 
 
 class ApplicationService:
-    def __init__(self, repository: FirestoreRepository | None = None):
-        self.repository = repository or FirestoreRepository()
-
-    def bootstrap_first_admin(self, actor_id_token: str) -> str:
-        return firebase_bootstrap_first_admin(actor_id_token=actor_id_token)
+    def __init__(self, repository: SQLiteRepository | None = None):
+        self.repository = repository or SQLiteRepository()
 
     def register_user_role(self, id_token: str, role: str) -> dict:
-        uid = firebase_register_user_role(id_token=id_token, role=role)
+        uid = sqlite_register_user_role(id_token=id_token, role=role)
         return {"uid": uid, "role": role}
 
     def list_records_for_user(self, user: CurrentUser, kind: str | None = None) -> list[dict]:

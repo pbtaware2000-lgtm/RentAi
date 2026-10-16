@@ -1,11 +1,11 @@
-"""Secure Firebase sign-in view for the existing Streamlit application."""
+"""Secure RentAI sign-in view for the Streamlit application."""
 
 import streamlit as st
 
 from frontend.authentication import (
     AuthenticationError,
     fetch_verified_user,
-    firebase_password_sign_in,
+    password_sign_in,
     normalize_email,
     save_session,
 )
@@ -27,7 +27,7 @@ def render(*, selected_role: str | None = None, allow_registration: bool = True)
     if submitted:
         try:
             email = normalize_email(email)
-            tokens = firebase_password_sign_in(email, password)
+            tokens = password_sign_in(email, password)
             user = fetch_verified_user(tokens["id_token"])
             if selected_role and user["role"] != selected_role:
                 st.error(

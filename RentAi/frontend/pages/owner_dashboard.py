@@ -1,4 +1,4 @@
-"""Owner portfolio overview with metrics from authorized Firestore records."""
+"""Owner portfolio overview with metrics from authorized SQLite records."""
 
 from datetime import date
 from html import escape

@@ -1,4 +1,4 @@
-"""Authenticated routes for Firebase-backed application records."""
+"""Authenticated routes for SQLite-backed application records."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 import logging
@@ -7,9 +7,7 @@ logger = logging.getLogger(__name__)
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from backend.auth.dependencies import CurrentUser, get_current_user, require_roles
-from backend.core.firebase import (
-    FirebaseConfigurationError,
-)
+from backend.core.auth import sign_in, register_account as create_sqlite_account
 from backend.schemas.application_schemas import (
     ApplicationRecordCreate,
     ApplicationRecordResponse,
@@ -49,11 +47,30 @@ def register_account(
         raise HTTPException(status_code=409, detail="An account role is already assigned") from exc
     except ValueError as exc:
         raise HTTPException(status_code=401, detail="Invalid or revoked token") from exc
-    except FirebaseConfigurationError as exc:
-        raise HTTPException(status_code=503, detail="Authentication service unavailable") from exc
     except Exception:
         logger.exception("Public account role provisioning failed")
         raise HTTPException(status_code=503, detail="Account registration service unavailable") from None
+
+
+@auth_router.post("/sign-in")
+def sign_in_account(payload: dict):
+    try:
+        uid, token = sign_in(str(payload.get("email", "")).strip().lower(), str(payload.get("password", "")))
+        from backend.repositories.sqlite_repository import SQLiteRepository
+        user = SQLiteRepository().account_by_uid(uid)
+        return {"id_token": token, "refresh_token": token, "expires_in": 30 * 24 * 3600, "user": user}
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+
+
+@auth_router.post("/sign-up", status_code=201)
+def sign_up_account(payload: dict):
+    try:
+        uid, token = create_sqlite_account(str(payload.get("email", "")).strip().lower(), str(payload.get("password", "")), str(payload.get("name", "")), str(payload.get("role", "")))
+        from backend.repositories.sqlite_repository import SQLiteRepository
+        return {"id_token": token, "refresh_token": token, "expires_in": 30 * 24 * 3600, "user": SQLiteRepository().account_by_uid(uid)}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @auth_router.get("/records")
@@ -148,50 +165,3 @@ def provision_user_role(
         raise HTTPException(status_code=403, detail="Trusted Admin authorization is required") from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail="Role provisioning request is invalid") from exc
-    except FirebaseConfigurationError as exc:
-        raise HTTPException(status_code=503, detail="Authentication service unavailable") from exc
-
-
-
-@admin_router.post("/bootstrap", status_code=204)
-def bootstrap_admin(
-    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
-):
-    """Provision only a UID explicitly configured by the deployment operator."""
-    if credentials is None or not credentials.credentials:
-        raise HTTPException(
-            status_code=401,
-            detail="Bearer token required",
-        )
-
-    try:
-        ApplicationService().bootstrap_first_admin(
-            credentials.credentials
-        )
-
-    except PermissionError as exc:
-        raise HTTPException(
-            status_code=403,
-            detail=str(exc),
-        ) from exc
-
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid or revoked token",
-        ) from exc
-
-    except FirebaseConfigurationError as exc:
-        logger.exception("Firebase configuration error during Admin bootstrap")
-        raise HTTPException(
-            status_code=503,
-            detail="Authentication service unavailable",
-        ) from exc
-
-    except Exception:
-        logger.exception("Unexpected error during Admin bootstrap")
-        raise HTTPException(
-            status_code=503,
-            detail="Authentication service unavailable",
-        ) from None
-

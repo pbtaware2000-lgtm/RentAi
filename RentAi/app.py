@@ -83,7 +83,7 @@ st.set_page_config(
 configuration_issues = startup_configuration_issues()
 if configuration_issues:
     st.warning(
-        "Firebase authentication setup needs attention: "
+        "RentAI setup needs attention: "
         + ", ".join(configuration_issues)
         + ". Values are read from the local .env file or process environment."
     )

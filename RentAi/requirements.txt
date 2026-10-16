@@ -7,7 +7,6 @@ xgboost
 matplotlib
 seaborn
 plotly
-firebase-admin
 python-dotenv
 cloudinary
 python-multipart
