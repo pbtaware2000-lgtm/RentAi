@@ -15,6 +15,8 @@ OWNER_MENU = (
     ("My Profile", "◉"),
 )
 
+OWNER_MENU = (*OWNER_MENU, ("Booking Requests", "▣"))
+
 
 def _select_owner_page(page: str) -> None:
     st.session_state.owner_active_page = page

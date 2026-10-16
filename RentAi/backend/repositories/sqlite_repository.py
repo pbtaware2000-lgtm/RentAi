@@ -66,6 +66,35 @@ def initialize_database():
             record_id TEXT NOT NULL, url TEXT NOT NULL, format TEXT, width INTEGER, height INTEGER,
             public_id TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS bookings (
+            id TEXT PRIMARY KEY, property_id TEXT NOT NULL REFERENCES application_records(id),
+            renter_uid TEXT NOT NULL REFERENCES users(uid), owner_uid TEXT NOT NULL REFERENCES users(uid),
+            move_in_date TEXT NOT NULL, monthly_rent REAL NOT NULL, security_deposit REAL NOT NULL DEFAULT 0,
+            amount_due INTEGER NOT NULL, currency TEXT NOT NULL DEFAULT 'INR',
+            status TEXT NOT NULL, payment_status TEXT NOT NULL,
+            availability_conflict INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_bookings_renter ON bookings(renter_uid, created_at);
+        CREATE INDEX IF NOT EXISTS idx_bookings_owner ON bookings(owner_uid, created_at);
+        CREATE INDEX IF NOT EXISTS idx_bookings_property_status ON bookings(property_id, status);
+        CREATE TABLE IF NOT EXISTS booking_payments (
+            id TEXT PRIMARY KEY, booking_id TEXT NOT NULL REFERENCES bookings(id),
+            provider TEXT NOT NULL DEFAULT 'razorpay', payment_link_id TEXT UNIQUE,
+            transaction_id TEXT UNIQUE, amount INTEGER NOT NULL, currency TEXT NOT NULL DEFAULT 'INR',
+            status TEXT NOT NULL, checkout_url TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_booking_payments_booking ON booking_payments(booking_id, created_at);
+        CREATE TABLE IF NOT EXISTS payment_webhook_events (
+            event_id TEXT PRIMARY KEY, received_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS booking_notifications (
+            id TEXT PRIMARY KEY, booking_id TEXT NOT NULL REFERENCES bookings(id),
+            recipient_uid TEXT NOT NULL REFERENCES users(uid), event_type TEXT NOT NULL,
+            message TEXT NOT NULL, created_at TEXT NOT NULL,
+            UNIQUE(booking_id, recipient_uid, event_type)
+        );
+        CREATE INDEX IF NOT EXISTS idx_booking_notifications_recipient ON booking_notifications(recipient_uid, created_at);
         CREATE TABLE IF NOT EXISTS notification_outbox (
             id TEXT PRIMARY KEY, event_key TEXT NOT NULL UNIQUE,
             owner_uid TEXT NOT NULL, event_type TEXT NOT NULL, payload TEXT NOT NULL,
@@ -402,6 +431,7 @@ class SQLiteRepository:
         with connect() as db: return [self._record(row) for row in db.execute("SELECT * FROM application_records")]
 
     def list_images(self):
+        with connect() as db: return [dict(row) for row in db.execute("SELECT * FROM application_images")]
         with connect() as db: return [dict(row) for row in db.execute("SELECT * FROM application_images ORDER BY rowid DESC")]
 
     def get_user_role(self, uid):
@@ -422,3 +452,6 @@ class SQLiteRepository:
             if not row: return None
             assigned=set(json.loads(row[0])); assigned.add(broker_uid); result=sorted(assigned)
             db.execute("UPDATE application_records SET assigned_broker_uids=? WHERE id=?",(json.dumps(result),record_id)); return result
+
+
+initialize_database()

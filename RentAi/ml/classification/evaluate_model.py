@@ -1,110 +1,45 @@
-"""Evaluate the production rent-category KNN on a held-out dataset split."""
+"""Read the classifier's actual held-out metrics from the training report."""
+import json
 
-from functools import lru_cache
-
-import numpy as np
-import pandas as pd
-
-from backend.services.classification_service import (
-	FEATURES,
-	_classify_against_training,
-)
-from backend.services.property_service import load_properties
-from ml.regression.rent_model import train_test_split
+from ml.pipelines import ARTIFACT_DIR
 
 
-EVALUATION_LABELS = ("High", "Low", "Medium", "Premium")
-
-
-@lru_cache(maxsize=1)
-def get_evaluation_results() -> dict[str, object]:
-    """Compute and cache metrics for the held-out split for UI and CLI use."""
-    data = load_properties()
-    target = "rent_category"
-    feature_columns = [*FEATURES, "city", "locality", "property_type"]
-    required = [*FEATURES, "city", "property_type", target]
-    if "locality" not in data.columns:
-        data["locality"] = ""
-    data["locality"] = data["locality"].fillna("").astype(str).str.strip()
-    missing_columns = sorted(set(required) - set(data.columns))
-    if missing_columns:
-        raise ValueError(f"Classification dataset is missing columns: {missing_columns}")
-
-    data = data.dropna(subset=required)
-    if data.empty:
-        raise ValueError("Classification dataset contains no complete labeled rows")
-
-    # Match the API's shuffled 80/20 split. The locality comparison uses the
-    # production classifier helper, while numeric ranges are fitted on train.
-    x_train, x_test, y_train, y_test = train_test_split(
-        data[feature_columns], data[target], test_size=0.2, random_state=42
-    )
-    training = x_train.copy()
-    training[target] = y_train
-    numeric = training.loc[:, FEATURES].to_numpy(dtype=float)
-    minima = numeric.min(axis=0)
-    ranges = np.ptp(numeric, axis=0)
-    ranges[ranges == 0] = 1.0
-
-    predictions = np.array([
-		_classify_against_training(row.to_dict(), training, minima, ranges)
-		for _, row in x_test.iterrows()
-	], dtype=object)
-    actual = y_test.to_numpy(dtype=object)
-
-    labels = list(EVALUATION_LABELS)
-    unexpected_labels = (set(actual) | set(predictions)) - set(labels)
-    labels.extend(sorted(unexpected_labels))
-    confusion = np.zeros((len(labels), len(labels)), dtype=int)
-    label_indices = {label: index for index, label in enumerate(labels)}
-    for truth, predicted in zip(actual, predictions):
-        confusion[label_indices[truth], label_indices[predicted]] += 1
-
-    per_class_precision = []
-    per_class_recall = []
-    for index in range(len(labels)):
-        true_positive = int(confusion[index, index])
-        predicted_count = int(confusion[:, index].sum())
-        actual_count = int(confusion[index, :].sum())
-        per_class_precision.append(true_positive / predicted_count if predicted_count else 0.0)
-        per_class_recall.append(true_positive / actual_count if actual_count else 0.0)
-
-    precision = float(np.mean(per_class_precision))
-    recall = float(np.mean(per_class_recall))
-    f1_per_class = [
-        (2 * p * r / (p + r)) if (p + r) else 0.0
-        for p, r in zip(per_class_precision, per_class_recall)
-    ]
-    f1 = float(np.mean(f1_per_class))
-    accuracy = float(np.mean(predictions == actual))
-
+def get_evaluation_results() -> dict:
+    path = ARTIFACT_DIR / "model_report.json"
+    if not path.exists():
+        raise FileNotFoundError("ML evaluation report is missing. Run `python -m ml.train` first.")
+    report = json.loads(path.read_text(encoding="utf-8"))
+    try:
+        result = report["classification"]["test_metrics"]
+    except KeyError as exc:
+        raise ValueError("The training report does not contain classification test metrics.") from exc
+    per_class = result.get("per_class", {})
+    labels = result.get("labels", [])
     return {
-        "accuracy": accuracy,
-        "precision_macro": precision,
-        "recall_macro": recall,
-        "f1_macro": f1,
+        "accuracy": result["accuracy"],
+        "precision_macro": per_class.get("macro avg", {}).get("precision", 0.0),
+        "recall_macro": per_class.get("macro avg", {}).get("recall", 0.0),
+        "f1_macro": result["macro_f1"],
+        "f1_weighted": result["weighted_f1"],
+        "per_class": {label: per_class.get(label, {}) for label in labels},
         "labels": labels,
-        "confusion_matrix": confusion,
-        "training_records": len(x_train),
-        "test_records": len(x_test),
+        "confusion_matrix": result["confusion_matrix"],
+        "training_records": result["train_records"],
+        "test_records": result["test_records"],
+        "model_name": report["classification"]["selected_model"],
+        "class_distribution": result["class_distribution"],
+        "scenario": result["scenario"],
+        "feature_importance": result.get("feature_importance", []),
     }
 
 
-def evaluate_model() -> dict[str, object]:
-    """Print and return the shared held-out evaluation result."""
-    results = get_evaluation_results()
-    print("RentAI classification evaluation (held-out test set)")
-    print(f"Training records: {results['training_records']:,}")
-    print(f"Test records:     {results['test_records']:,}")
-    print("Averaging:        macro (unweighted mean across classes)")
-    print(f"Accuracy:         {results['accuracy']:.6f}")
-    print(f"Precision:        {results['precision_macro']:.6f}")
-    print(f"Recall:           {results['recall_macro']:.6f}")
-    print(f"F1-score:         {results['f1_macro']:.6f}")
+def evaluate_model() -> dict:
+    result = get_evaluation_results()
+    print(f"Selected model: {result['model_name']}")
+    print(f"Accuracy: {result['accuracy']:.4f}; macro F1: {result['f1_macro']:.4f}; weighted F1: {result['f1_weighted']:.4f}")
     print("Confusion matrix (rows=actual, columns=predicted):")
-    print("Labels: " + ", ".join(results["labels"]))
-    print(results["confusion_matrix"])
-    return results
+    print(result["confusion_matrix"])
+    return result
 
 
 if __name__ == "__main__":

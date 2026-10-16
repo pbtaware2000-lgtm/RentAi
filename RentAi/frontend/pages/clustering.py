@@ -9,6 +9,37 @@ from frontend.components.data_utils import page_heading
 from ml.clustering.dbscan import cluster_properties as dbscan_properties
 from ml.clustering.kmeans import cluster_properties
 from ml.clustering.pca import explore_pca
+from backend.services.clustering_service import cluster_analytics, find_similar_properties
+
+
+def _render_trained_clustering(data: pd.DataFrame) -> None:
+	st.subheader("Trained property groups and recommendations")
+	try:
+		analytics = cluster_analytics()
+	except (FileNotFoundError, ValueError) as exc:
+		st.info(str(exc))
+		return
+	st.caption(f"Saved K-Means model selected K={analytics['selected_k']} using rent, area, room counts, property type, furnishing and city. Legacy `cluster_id` was excluded.")
+	metrics = pd.DataFrame(analytics["candidate_metrics"])
+	if not metrics.empty:
+		st.dataframe(metrics, hide_index=True, width="stretch")
+	profiles = pd.DataFrame(analytics["profiles"])
+	if not profiles.empty:
+		st.markdown("**Cluster profiles**")
+		st.dataframe(profiles, hide_index=True, width="stretch")
+	if "property_id" in data:
+		selected = st.text_input("Dataset property ID", key="trained-similar-property")
+		if selected and st.button("Find similar properties", key="trained-similar-search"):
+			try:
+				matches = find_similar_properties(selected, limit=5)
+			except (FileNotFoundError, ValueError) as exc:
+				st.info(str(exc))
+			else:
+				st.caption("Ranked by Euclidean distance after the saved imputer, one-hot encoder and scaler; the selected property is excluded.")
+				if matches:
+					st.dataframe(pd.DataFrame(matches), hide_index=True, width="stretch")
+				else:
+					st.info("No comparable listings were found.")
 
 
 def _render_cluster_visualization(
@@ -106,7 +137,6 @@ def _render_similar_properties(assignments: pd.DataFrame, data: pd.DataFrame, me
 			key=f"similar-property-locality-{city}",
 			disabled=not localities,
 		)
-
 		property_types = sorted(data["property_type"].dropna().astype(str).str.strip().unique().tolist())
 		bedroom_values = pd.to_numeric(data["bedrooms"], errors="coerce").dropna().unique().tolist()
 		bedrooms = sorted(float(value) for value in bedroom_values)
@@ -248,6 +278,7 @@ def _render_similar_properties(assignments: pd.DataFrame, data: pd.DataFrame, me
 		)
 def render(data: pd.DataFrame) -> None:
 	page_heading("Property Clustering", "Explore principal components or group listings using selected numeric property features.")
+	_render_trained_clustering(data)
 	if data.empty:
 		st.info("Add property rows to the CSV to run clustering.")
 		return
@@ -442,5 +473,3 @@ def render(data: pd.DataFrame) -> None:
 			width="stretch",
 			hide_index=True,
 		)
-
-	_render_similar_properties(assignments, data, method)

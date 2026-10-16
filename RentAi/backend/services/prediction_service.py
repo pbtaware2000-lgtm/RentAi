@@ -1,21 +1,20 @@
-"""Train and use the rent model in memory for API predictions."""
+"""Load the saved regression pipeline once per API process."""
 
 from functools import lru_cache
 
-import pandas as pd
-
-from ml.regression.rent_model import encode_features, train_model
+from ml.pipelines import load_artifact, predict_rent_result
 
 
 @lru_cache(maxsize=1)
 def _get_model():
-    """Train once per API process and retain the fitted model in memory."""
-    return train_model()
+    """Load, never train, the model once per API process."""
+    return load_artifact("regression")
 
 
 def predict_rent(features: dict) -> float:
-    """Predict monthly rent after encoding categorical request features."""
-    model, feature_columns = _get_model()
-    sample = pd.DataFrame([features])
-    sample = encode_features(sample, feature_columns)
-    return float(model.predict(sample)[0])
+    """Backwards-compatible scalar prediction helper."""
+    return float(predict_rent_result(features, _get_model())["predicted_rent"])
+
+
+def predict_rent_details(features: dict) -> dict:
+    return predict_rent_result(features, _get_model())
