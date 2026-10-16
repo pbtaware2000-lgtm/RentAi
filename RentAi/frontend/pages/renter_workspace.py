@@ -1,12 +1,23 @@
 """Pages and shared rendering for the authenticated Renter workspace."""
 
 from html import escape
+import logging
 
 import pandas as pd
 import streamlit as st
 
 from frontend.application_api import (ApplicationAPIError, booking_checkout, booking_notifications, booking_payment_configured,
                                       bookings as booking_records, create, delete, records, update)
+from frontend.application_api import (
+    ApplicationAPIError,
+    create,
+    create_rent_payment_order,
+    delete,
+    records,
+    update,
+    verify_rent_payment,
+)
+from frontend.components.razorpay_checkout import razorpay_checkout
 from frontend.pages import rent_prediction
 from frontend.pages.renter_support import (
     CATALOG_SOURCE, OWNER_LISTING_SOURCE, UNKNOWN_SOURCE,
@@ -15,6 +26,10 @@ from frontend.pages.renter_support import (
     load_search_records, property_id, renter_key, saved_properties,
 )
 from frontend.components.property_images import render_property_image
+
+
+# Temporary, value-free checkout diagnostics; remove after confirming the live flow.
+_payment_logger = logging.getLogger(__name__)
 
 
 def filter_properties(items: list[tuple[dict, str]], filters: dict) -> list[tuple[dict, str]]:
@@ -210,6 +225,8 @@ def render_search(data: pd.DataFrame) -> None:
             st.caption(f"{exc.method} {exc.path} returned HTTP 404{detail}")
     result = {**records_result, "catalog": dataset_properties(data)}
     _page_header("Search Properties", "Search the RentAI dataset and published Owner listings. Each source is labeled.")
+    if st.session_state.pop(renter_key("enquiry_success"), False):
+        st.success("Your enquiry was sent to the property Owner.")
     catalog = result["catalog"]
     owner_listings = owner_listing_properties(result["listings"] or [])
     all_items = [(p, "catalog") for p in catalog] + [(p, "owner_listing") for p in owner_listings]
@@ -278,6 +295,7 @@ def render_search(data: pd.DataFrame) -> None:
             for col, (prop, _) in zip(cols, visible_owner[start:start + 3]):
                 with col:
                     display_property_card(prop, source="owner_listing", favorites=result["favorites"], key_suffix="search")
+        _render_listing_enquiry(owner_listings)
         if len(visible_owner) < len(owner_matches) and st.button("Load more Owner listings", key="renter_owner_search_load_more"):
             st.session_state[renter_key("owner_search_page")] = owner_page + 1
             st.rerun()
@@ -298,6 +316,54 @@ def render_search(data: pd.DataFrame) -> None:
         if len(visible_catalog) < len(catalog_matches) and st.button("Load more catalog properties", key="renter_catalog_search_load_more"):
             st.session_state[renter_key("catalog_search_page")] = catalog_page + 1
             st.rerun()
+
+
+def _render_listing_enquiry(owner_listings: list[dict]) -> None:
+    state_key = renter_key("enquiry_listing")
+    selected_id = st.session_state.get(state_key)
+    if not selected_id:
+        return
+    selected = next((item for item in owner_listings if str(item.get("id")) == str(selected_id)), None)
+    if selected is None:
+        st.session_state.pop(state_key, None)
+        st.info("That listing is no longer published and cannot receive an enquiry.")
+        return
+
+    st.subheader("Send an enquiry")
+    st.caption(
+        f"{selected.get('title') or 'Property'} · "
+        f"{', '.join(filter(None, [selected.get('locality'), selected.get('city')]))} · "
+        f"{format_money(selected.get('rent'))}"
+    )
+    with st.form("renter_search_send_enquiry"):
+        name = st.text_input(
+            "Your name *", value=st.session_state.get("rentai_display_name", ""), max_chars=160,
+        )
+        phone = st.text_input("Phone (optional)", max_chars=40)
+        message = st.text_area("Optional message to the Owner", max_chars=2000)
+        send = st.form_submit_button("Submit enquiry", type="primary")
+    cancel_col, _ = st.columns([1, 4])
+    cancel = cancel_col.button("Cancel", key="renter_cancel_search_enquiry")
+    if cancel:
+        st.session_state.pop(state_key, None)
+        st.rerun()
+    if not send:
+        return
+    if not name.strip():
+        st.error("Enter your name so the Owner knows who sent the enquiry.")
+        return
+    try:
+        create("inquiry", {
+            "listing_id": str(selected["id"]),
+            "client_name": name.strip(),
+            "client_phone": phone.strip(),
+            "message": message.strip(),
+        })
+        st.session_state.pop(state_key, None)
+        st.session_state[renter_key("enquiry_success")] = True
+        st.rerun()
+    except ApplicationAPIError as exc:
+        st.error(str(exc))
 
 
 def render_prediction(data: pd.DataFrame) -> None:
@@ -446,6 +512,8 @@ def render_enquiries(data: pd.DataFrame) -> None:
     result = _load(data)
     if result is None: return
     _page_header("My Enquiries", "Review the enquiry records you have sent to published property Owners.")
+    if st.session_state.pop(renter_key("enquiry_success"), False):
+        st.success("Your enquiry was sent to the property Owner.")
     listings = {item["id"]: item for item in owner_listing_properties(result["listings"])}
     with st.expander("Send a new enquiry", expanded=not result["enquiries"]):
         if not listings:
@@ -465,37 +533,137 @@ def render_enquiries(data: pd.DataFrame) -> None:
                 )
                 name = st.text_input("Your name", value=st.session_state.get("rentai_display_name", ""), max_chars=160)
                 phone = st.text_input("Phone (optional)", max_chars=40)
-                message = st.text_area("Message to the Owner", max_chars=2000)
+                message = st.text_area("Optional message to the Owner", max_chars=2000)
                 submitted = st.form_submit_button("Send enquiry", type="primary")
             if submitted:
-                if not name.strip() or not message.strip():
-                    st.error("Enter your name and a message.")
+                if not name.strip():
+                    st.error("Enter your name.")
                 else:
                     try:
                         create("inquiry", {"listing_id": listing_id, "client_name": name.strip(), "client_phone": phone.strip(), "message": message.strip()})
-                        st.success("Your enquiry was sent to the property Owner.")
+                        st.session_state[renter_key("enquiry_success")] = True
                         st.rerun()
                     except ApplicationAPIError as exc:
                         st.error(str(exc))
     enquiries = result["enquiries"]
-    filter_choice = st.selectbox("Filter enquiries", ["All", "New", "In progress", "Closed"])
-    status_groups = {"New": {"new"}, "In progress": {"contacted", "viewing_scheduled"}, "Closed": {"completed", "closed"}}
-    view = [item for item in enquiries if filter_choice == "All" or (item.get("data") or {}).get("status", "new") in status_groups.get(filter_choice, set())]
+    status_groups = {
+        "Pending": {"new", "pending", "contacted", "viewing_scheduled"},
+        "Accepted": {"accepted"}, "Rejected": {"rejected"},
+    }
+    filter_choice = st.selectbox("Filter enquiries", ["All", *status_groups])
+    view = [item for item in enquiries if filter_choice == "All" or (item.get("data") or {}).get("status", "pending") in status_groups.get(filter_choice, set())]
     if not view:
         st.info("No enquiries in this view yet.")
         return
     for item in sorted(view, key=lambda record: (record.get("data") or {}).get("created_at", ""), reverse=True):
         detail = item.get("data") or {}
         listing = listings.get(detail.get("listing_id"), {})
+        property_data = detail.get("property") or listing
         with st.container(border=True):
             cols = st.columns([2, 1, 1])
-            cols[0].markdown(f"**{listing.get('title', 'Property listing')}**")
-            cols[0].caption(", ".join(filter(None, [listing.get("locality"), listing.get("city")])) or "Owner listing reference")
-            cols[1].metric("Status", str(detail.get("status", "new")).replace("_", " ").title())
+            cols[0].markdown(f"**{property_data.get('title', 'Property listing')}**")
+            cols[0].caption(", ".join(filter(None, [property_data.get("locality"), property_data.get("city")])) or "Owner listing reference")
+            status = detail.get("status", "pending")
+            cols[1].metric("Status", "Pending" if status in {"new", "contacted", "viewing_scheduled"} else status.title())
             cols[2].caption(f"Reference: {item.get('id', '')}")
-            st.write(detail.get("message", ""))
+            if detail.get("message"):
+                st.write(detail["message"])
+            else:
+                st.caption("No message was included.")
             sent = detail.get("created_at") or "Date not recorded"
             st.caption(f"Sent {sent} as {detail.get('client_name') or 'Renter'} · your provided contact details are available to the listing Owner.")
+
+
+def render_rent_payments(data: pd.DataFrame | None = None) -> None:
+    _page_header("Pay Rent", "Review rent due for your confirmed tenancies and pay securely with Razorpay Test Mode.")
+    if st.session_state.pop("rentai_rent_payment_success", False):
+        st.success("Razorpay confirmed the captured payment. Your rent record is now Paid.")
+    try:
+        rent_records = records("rent_payment")
+    except ApplicationAPIError as exc:
+        st.error(str(exc))
+        return
+    if not rent_records:
+        st.info("There are no rent records linked to your account. An Owner must confirm a tenancy and record rent due first.")
+        return
+
+    checkout = st.session_state.get("rentai_rent_checkout")
+    checkout_record = next((item for item in rent_records if item.get("id") == (checkout or {}).get("rent_record_id")), None)
+    if checkout_record is None or (checkout_record.get("data") or {}).get("status") != "pending":
+        st.session_state.pop("rentai_rent_checkout", None)
+        checkout = None
+
+    for record in sorted(rent_records, key=lambda item: (item.get("data") or {}).get("due_date", "")):
+        detail = record.get("data") or {}
+        status = detail.get("status", "pending")
+        try:
+            amount = float(detail.get("amount"))
+            amount_label = f"₹{amount:,.2f}"
+        except (TypeError, ValueError):
+            amount_label = "Amount unavailable"
+        with st.container(border=True):
+            cols = st.columns([2, 1, 1])
+            cols[0].markdown(f"**{detail.get('property_title') or 'Rental property'}**")
+            cols[0].caption(f"Rent period: {detail.get('period', 'Not recorded')} · Due: {detail.get('due_date', 'Not recorded')}")
+            cols[1].metric("Amount", amount_label)
+            cols[2].metric("Status", status.title())
+            if status == "paid":
+                cols[0].caption(f"Paid {detail.get('paid_date', '')} · Receipt: {detail.get('payment_reference', 'Recorded')}")
+            elif status == "pending":
+                if checkout and checkout.get("rent_record_id") == record.get("id"):
+                    st.caption("Complete checkout below. Rent is not marked Paid until RentAI verifies the Razorpay signature and captured payment status.")
+                elif st.button("Pay with Razorpay", key=f"renter_pay_rent_{record.get('id')}", type="primary"):
+                    _payment_logger.info("Razorpay checkout stage=pay_rent_button_clicked")
+                    try:
+                        order = create_rent_payment_order(record["id"])
+                        st.session_state["rentai_rent_checkout"] = {
+                            **order, "rent_record_id": record["id"],
+                        }
+                        _payment_logger.info(
+                            "Razorpay checkout stage=checkout_details_saved key_id_present=%s order_id_present=%s amount_present=%s",
+                            bool(order.get("key_id")), bool(order.get("order_id")),
+                            order.get("amount") is not None,
+                        )
+                        st.rerun()
+                    except ApplicationAPIError as exc:
+                        st.error(str(exc))
+
+    checkout = st.session_state.get("rentai_rent_checkout")
+    if checkout:
+        st.subheader("Secure checkout")
+        st.write(f"{checkout.get('description', 'Rent payment')} · ₹{checkout['amount'] / 100:,.2f}")
+        component_nonce = st.session_state.get("rentai_rent_checkout_nonce", 0)
+        response = razorpay_checkout(
+            checkout=checkout,
+            key=f"razorpay-checkout-{checkout['order_id']}-{component_nonce}",
+        )
+        if response is not None:
+            _payment_logger.info(
+                "Razorpay checkout stage=component_return_received response_type=%s status=%s",
+                type(response).__name__,
+                response.get("status") if isinstance(response, dict) else "unrecognized",
+            )
+        if isinstance(response, dict) and response.get("status") == "checkout_success":
+            try:
+                if response.get("razorpay_order_id") != checkout.get("order_id"):
+                    raise ApplicationAPIError("Razorpay returned an order that does not match this rent record.")
+                verify_rent_payment(
+                    response.get("razorpay_payment_id", ""),
+                    response.get("razorpay_order_id", ""),
+                    response.get("razorpay_signature", ""),
+                )
+                st.session_state.pop("rentai_rent_checkout", None)
+                st.session_state["rentai_rent_payment_success"] = True
+                st.rerun()
+            except ApplicationAPIError as exc:
+                st.session_state["rentai_rent_checkout_nonce"] = component_nonce + 1
+                st.error(str(exc))
+        elif isinstance(response, dict) and response.get("status") == "checkout_failed":
+            st.session_state["rentai_rent_checkout_nonce"] = component_nonce + 1
+            st.error(response.get("message") or "Razorpay could not complete this payment. The rent record remains Pending.")
+        elif isinstance(response, dict) and response.get("status") == "checkout_cancelled":
+            st.session_state["rentai_rent_checkout_nonce"] = component_nonce + 1
+            st.info("Checkout was cancelled. The rent remains Pending; you can retry when ready.")
 
 
 def render_profile(data: pd.DataFrame | None = None) -> None:

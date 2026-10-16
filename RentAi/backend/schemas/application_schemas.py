@@ -1,4 +1,4 @@
-"""HTTP schemas for Firebase-backed application records and images."""
+"""HTTP schemas for application records and images."""
 
 from typing import Any
 
@@ -15,6 +15,12 @@ class ApplicationRecordResponse(BaseModel):
     owner_uid: str
     kind: str
     data: dict[str, Any]
+
+
+class RazorpayPaymentVerificationRequest(BaseModel):
+    razorpay_payment_id: str = Field(min_length=1, max_length=80)
+    razorpay_order_id: str = Field(min_length=1, max_length=80)
+    razorpay_signature: str = Field(min_length=1, max_length=128)
 
 
 class ImageMetadataRequest(BaseModel):

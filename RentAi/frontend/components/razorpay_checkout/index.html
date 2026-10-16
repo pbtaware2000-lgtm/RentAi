@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    body { margin: 0; font: 14px Arial, sans-serif; color: #172033; }
+    button { border: 0; border-radius: 8px; padding: 11px 18px; background: #f36b21;
+      color: white; font-weight: 700; cursor: pointer; }
+    button:disabled { opacity: .65; cursor: wait; }
+    #status { display: inline-block; margin-left: 10px; color: #526071; }
+  </style>
+</head>
+<body>
+  <button id="pay" type="button">Continue to secure checkout</button>
+  <span id="status" aria-live="polite"></span>
+  <script>
+    (() => {
+      const button = document.getElementById("pay");
+      const status = document.getElementById("status");
+      let options = null;
+      let popup = null;
+      let channel = null;
+      let resultSent = false;
+      let handshakeTimer = null;
+      let popupMonitor = null;
+      const log = (stage, details = {}) => console.info("[RentAI Razorpay]", { stage, ...details });
+      const setHeight = () => window.parent.postMessage({
+        isStreamlitMessage: true,
+        type: "streamlit:setFrameHeight",
+        height: document.body.scrollHeight
+      }, "*");
+      const send = (value) => {
+        log("component_value_sent", { status: value.status });
+        window.parent.postMessage({
+          isStreamlitMessage: true,
+          type: "streamlit:setComponentValue",
+          value
+        }, "*");
+      };
+      const clearPopupTracking = () => {
+        if (handshakeTimer !== null) window.clearTimeout(handshakeTimer);
+        if (popupMonitor !== null) window.clearInterval(popupMonitor);
+        handshakeTimer = null;
+        popupMonitor = null;
+      };
+      const fail = (message) => {
+        log("checkout_error_displayed");
+        clearPopupTracking();
+        if (popup && !popup.closed) popup.close();
+        popup = null;
+        channel = null;
+        resultSent = false;
+        button.disabled = false;
+        status.textContent = message;
+        setHeight();
+      };
+      const makeChannel = () => {
+        if (!window.crypto || !window.crypto.getRandomValues) return null;
+        const bytes = new Uint8Array(16);
+        window.crypto.getRandomValues(bytes);
+        return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+      };
+      const onPopupMessage = (event) => {
+        if (!popup || event.source !== popup || event.origin !== window.location.origin ||
+            !event.data || event.data.channel !== channel) return;
+        const message = event.data;
+        if (message.type === "rentai_checkout_ready") {
+          log("checkout_tab_ready");
+          window.clearTimeout(handshakeTimer);
+          handshakeTimer = null;
+          const safeCheckout = {
+            key_id: options.key_id,
+            order_id: options.order_id,
+            amount: options.amount,
+            currency: options.currency,
+            name: options.name || "RentAI",
+            description: options.description || "Rent payment",
+          };
+          popup.postMessage({ type: "rentai_checkout_init", channel, checkout: safeCheckout }, event.origin);
+          return;
+        }
+        if (message.type === "rentai_checkout_status") {
+          status.textContent = typeof message.message === "string" ? message.message.slice(0, 180) : "Secure checkout is opening in the new tab.";
+          log("checkout_tab_status", { status: message.status || "unknown" });
+          setHeight();
+          return;
+        }
+        if (message.type !== "rentai_checkout_result" || resultSent) return;
+        resultSent = true;
+        clearPopupTracking();
+        popup.postMessage({ type: "rentai_checkout_ack", channel }, event.origin);
+        const result = message.result || {};
+        if (result.status === "checkout_success") {
+          const validResponse = typeof result.razorpay_payment_id === "string" &&
+            typeof result.razorpay_order_id === "string" &&
+            typeof result.razorpay_signature === "string" &&
+            result.razorpay_order_id === options.order_id;
+          if (!validResponse) {
+            log("checkout_callback_rejected", { reason: "invalid_or_mismatched_order" });
+            send({ status: "checkout_failed", message: "Checkout returned invalid details. The rent record remains Pending." });
+            status.textContent = "Payment details could not be matched. Return to RentAI and retry.";
+            button.disabled = false;
+          } else {
+            log("checkout_callback_received", { required_fields_present: true });
+            send(result);
+            status.textContent = "Payment response sent to RentAI. Return to the RentAI tab to confirm verification.";
+            button.disabled = true;
+          }
+        } else if (result.status === "checkout_cancelled") {
+          log("checkout_cancelled");
+          send({ status: "checkout_cancelled" });
+          status.textContent = "Checkout was cancelled. Return to RentAI; the rent remains Pending.";
+          button.disabled = false;
+        } else {
+          log("checkout_failed");
+          send({
+            status: "checkout_failed",
+            message: typeof result.message === "string" ? result.message.slice(0, 180) : "Razorpay could not complete the payment."
+          });
+          status.textContent = "Checkout failed. Return to RentAI to retry; the rent remains Pending.";
+          button.disabled = false;
+        }
+        setHeight();
+      };
+      const openCheckoutTab = () => {
+        if (!options || popup) return;
+        channel = makeChannel();
+        if (!channel) {
+          fail("Secure checkout could not start in this browser. Enable a modern browser and retry.");
+          return;
+        }
+        const checkoutUrl = new URL("checkout.html", window.location.href);
+        checkoutUrl.hash = channel;
+        status.textContent = "Opening secure checkout in a new tab...";
+        button.disabled = true;
+        log("checkout_tab_open_requested");
+        // Must stay synchronous with the actual click to satisfy popup blockers.
+        popup = window.open(checkoutUrl.href, "_blank");
+        if (!popup) {
+          channel = null;
+          button.disabled = false;
+          status.textContent = "Your browser blocked the checkout tab. Allow pop-ups for RentAI, then retry.";
+          log("checkout_tab_blocked");
+          setHeight();
+          return;
+        }
+        window.addEventListener("message", onPopupMessage);
+        handshakeTimer = window.setTimeout(() => {
+          if (popup && !resultSent) fail("The checkout tab could not connect. Close it, check your browser settings, and retry.");
+        }, 15000);
+        popupMonitor = window.setInterval(() => {
+          if (popup && popup.closed && !resultSent) {
+            clearPopupTracking();
+            popup = null;
+            channel = null;
+            button.disabled = false;
+            status.textContent = "The checkout tab was closed. The rent remains Pending unless payment was already completed and verified.";
+            log("checkout_tab_closed_without_result");
+            setHeight();
+          }
+        }, 500);
+        setHeight();
+      };
+      button.addEventListener("click", () => {
+        log("checkout_button_clicked", { order_details_present: Boolean(options) });
+        if (!options || popup) return;
+        openCheckoutTab();
+      });
+      window.addEventListener("message", (event) => {
+        if (!event.data || event.data.type !== "streamlit:render") return;
+        options = event.data.args && event.data.args.checkout;
+        const valid = Boolean(options && typeof options.key_id === "string" &&
+          options.key_id.startsWith("rzp_test_") && typeof options.order_id === "string" &&
+          /^order_[A-Za-z0-9]+$/.test(options.order_id) && Number.isSafeInteger(options.amount) &&
+          options.amount > 0 && options.currency === "INR");
+        log("streamlit_render_received", {
+          checkout_details_valid: valid,
+          key_id_present: Boolean(options && options.key_id),
+          order_id_present: Boolean(options && options.order_id),
+          amount_present: Boolean(options && options.amount),
+        });
+        button.disabled = false;
+        if (!valid) {
+          status.textContent = "Valid Test Mode checkout details were not returned. Refresh RentAI and retry.";
+          log("checkout_details_rejected");
+        } else {
+          status.textContent = "";
+        }
+        setHeight();
+      });
+      window.addEventListener("error", (event) => {
+        log("uncaught_component_error", { error_name: event.error && event.error.name || "Error" });
+      });
+      window.addEventListener("unhandledrejection", (event) => {
+        log("unhandled_component_rejection", { error_name: event.reason && event.reason.name || "Error" });
+      });
+      window.parent.postMessage({
+        isStreamlitMessage: true,
+        type: "streamlit:componentReady",
+        apiVersion: 1
+      }, "*");
+      log("streamlit_component_ready_sent");
+      setHeight();
+    })();
+  </script>
+</body>
+</html>

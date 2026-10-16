@@ -54,7 +54,6 @@ OWNER_SECTION_RENDERERS = {
     "Revenue & Rent Collection": owner_sections.render_revenue,
     "Maintenance Requests": owner_sections.render_maintenance,
     "My Profile": owner_sections.render_profile,
-    "Settings": owner_sections.render_settings,
 }
 
 RENTER_SECTION_RENDERERS = {
@@ -65,6 +64,7 @@ RENTER_SECTION_RENDERERS = {
     "Saved Properties": renter_workspace.render_saved,
     "My Enquiries": renter_workspace.render_enquiries,
     "My Bookings": renter_workspace.render_bookings,
+    "Pay Rent": renter_workspace.render_rent_payments,
     "My Profile": renter_workspace.render_profile,
 }
 
@@ -84,7 +84,7 @@ st.set_page_config(
 configuration_issues = startup_configuration_issues()
 if configuration_issues:
     st.warning(
-        "Firebase authentication setup needs attention: "
+        "RentAI setup needs attention: "
         + ", ".join(configuration_issues)
         + ". Values are read from the local .env file or process environment."
     )
