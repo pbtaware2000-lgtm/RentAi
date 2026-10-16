@@ -2,7 +2,7 @@
 
 import streamlit as st
 
-from backend.services.prediction_service import predict_rent
+from backend.services.prediction_service import predict_rent_details
 from frontend.components.data_utils import category_options, page_heading
 
 
@@ -82,10 +82,28 @@ def render(data) -> None:
 		with parking_col:
 			parking_value = _category_input(data, "parking", "Parking", key="prediction-parking")
 
+		balcony_col, floors_col, supply_col = st.columns(3)
+		with balcony_col:
+			balcony = st.number_input("Balconies", min_value=0, value=0, step=1, key="prediction-balcony")
+		with floors_col:
+			total_floors = st.number_input("Total floors", min_value=1, value=1, step=1, key="prediction-total-floors")
+		with supply_col:
+			supply_options = category_options(data, "water_supply")
+			water_supply = st.selectbox("Water supply", supply_options, key="prediction-water-supply") if supply_options else None
+
+		distance_columns = ["distance_to_metro_km", "distance_to_school_km", "distance_to_hospital_km", "distance_to_it_park_km"]
+		distance_values = {}
+		for offset in range(0, len(distance_columns), 2):
+			columns = st.columns(2)
+			for column, name in zip(columns, distance_columns[offset:offset + 2]):
+				label = name.replace("distance_to_", "").replace("_km", "").replace("_", " ").title() + " distance (km)"
+				provided = column.checkbox(f"Provide {label.lower()}", value=False, key=f"prediction-provide-{name}")
+				distance_values[name] = column.number_input(label, min_value=0.0, value=0.0, step=0.5, key=f"prediction-{name}") if provided else None
+
 		amenity_columns = [name for name in ("lift", "gym", "security", "power_backup", "swimming_pool", "air_conditioning", "gated_community") if name in data.columns]
 		amenities = st.multiselect("Amenities", amenity_columns, key="prediction-amenities") if amenity_columns else []
 		if amenity_columns:
-			st.caption("Amenities are shown for listing context; the current regression model does not use them.")
+			st.caption("Selected amenities are passed to the regression model as present/absent values.")
 		submitted = st.button("Predict Rent", type="primary", width="stretch")
 
 	if submitted:
@@ -117,15 +135,20 @@ def render(data) -> None:
 						"area_sqft": float(area_sqft),
 						"bedrooms": int(bedrooms),
 						"bathrooms": int(bathrooms),
+						"balcony": int(balcony),
 						"floor": int(floor),
+						"total_floors": int(total_floors),
 						"distance_to_city_center_km": float(distance),
+						**{name: (float(value) if value is not None else None) for name, value in distance_values.items()},
 						"age_of_property": int(age),
 						"parking": parking,
+						"water_supply": water_supply,
+						**{name: ("Yes" if name in amenities else "No") for name in amenity_columns},
 					}
 					with st.spinner("Estimating monthly rent..."):
-						predicted_rent = predict_rent(features)
+						prediction = predict_rent_details(features)
 					st.session_state.prediction_result = {
-						"predicted_rent": predicted_rent,
+						**prediction,
 						"features": features,
 						"amenities": amenities,
 					}
@@ -145,11 +168,17 @@ def render(data) -> None:
 
 	result = st.session_state.prediction_result
 	if result:
-		st.success("The regression model produced a rent estimate for this listing.")
+		st.success(f"The saved {result['model_name']} model produced a rent estimate.")
 		with st.container(border=True):
 			st.subheader("Predicted Monthly Rent")
 			st.metric("Model estimate", f"₹{result['predicted_rent']:,.0f} INR")
-			st.caption("This is the model's output for the supplied features, not a guarantee of the real-world market rent.")
+			st.caption(result["limitations"])
+			metrics = result.get("test_metrics", {})
+			if metrics:
+				st.caption(f"Held-out evaluation: MAE ₹{metrics.get('mae', 0):,.0f} · RMSE ₹{metrics.get('rmse', 0):,.0f} · R² {metrics.get('r2', 0):.3f}")
+			if metrics.get("feature_importance"):
+				st.markdown("**Model feature importance / coefficient magnitude**")
+				st.dataframe(metrics["feature_importance"], hide_index=True, width="stretch")
 			st.markdown("**Submitted property details**")
 			features = result["features"]
 			detail_rows = [
@@ -164,7 +193,7 @@ def render(data) -> None:
 				("Distance to center", f"{features['distance_to_city_center_km']:,.1f} km"),
 				("Property age", f"{features['age_of_property']} years"),
 				("Parking", features["parking"]),
-				("Amenities (not used by model)", ", ".join(result["amenities"]) or "None selected"),
+				("Amenities", ", ".join(result["amenities"]) or "None selected"),
 			]
 			for start in range(0, len(detail_rows), 3):
 				columns = st.columns(3)

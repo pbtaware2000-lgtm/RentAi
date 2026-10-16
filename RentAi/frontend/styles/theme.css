@@ -292,6 +292,30 @@ h3 { font-size: 1rem; font-weight: 700; }
 	border-color: var(--rentai-border);
 }
 
+div[class*="st-key-rentai-property-photo-"] [data-testid="stImage"] img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	border-radius: 10px;
+}
+
+div[class*="st-key-rentai-property-photo-"] [data-testid="stImage"] {
+	width: 100%;
+	aspect-ratio: 16 / 9;
+	overflow: hidden;
+}
+
+div[class*="st-key-rentai-property-photo-"] .renter-property-placeholder {
+	width: 100%;
+	aspect-ratio: 16 / 9;
+	display: grid;
+	place-items: center;
+	border-radius: 10px;
+	background: linear-gradient(135deg, #edf2f7, #f8fafc);
+	color: #68758a;
+	font-size: .9rem;
+}
+
 @media (max-width: 850px) {
 	[data-testid="stMainBlockContainer"] {
 		padding: 1rem .8rem 2rem;

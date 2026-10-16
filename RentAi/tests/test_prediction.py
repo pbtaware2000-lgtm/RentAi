@@ -13,7 +13,7 @@ from backend.main import app
 from backend.schemas.prediction_schema import RentPredictionRequest
 from backend.services.prediction_service import _get_model, predict_rent
 from frontend.data_loader import DATA_PATH, load_dataset
-from ml.regression.rent_model import DATASET_PATH, FEATURES, TARGET, encode_features, train_test_split
+from ml.regression.rent_model import DATASET_PATH, FEATURES, TARGET
 
 
 class RentPredictionIntegrationTests(unittest.TestCase):
@@ -56,23 +56,12 @@ class RentPredictionIntegrationTests(unittest.TestCase):
 		self.assertEqual(response.status_code, 422)
 
 	def test_training_and_prediction_use_the_same_encoded_feature_columns(self):
-		model, feature_columns = _get_model()
-		x_train, _, _, _ = train_test_split(
-			self.complete_data[FEATURES], self.complete_data[TARGET],
-			test_size=0.2, random_state=42,
-		)
-		sample = x_train.iloc[0]
+		artifact = _get_model()
+		feature_columns = artifact["features"]
+		self.assertEqual(artifact["pipeline"].named_steps["preprocessor"].feature_names_in_.tolist(), feature_columns)
+		sample = self.complete_data.iloc[0]
 		features = self._features_from_row(sample)
-		trained_sample = encode_features(pd.DataFrame([features]), feature_columns)
-		self.assertEqual(trained_sample.columns.tolist(), feature_columns)
-		self.assertEqual(model.coefficients.shape[0], len(feature_columns) + 1)
-
-		with patch(
-			"backend.services.prediction_service.encode_features", wraps=encode_features
-		) as prediction_preprocessor:
-			prediction = predict_rent(features)
-		prediction_preprocessor.assert_called_once()
-		self.assertEqual(prediction_preprocessor.call_args.args[1], feature_columns)
+		prediction = predict_rent(features)
 		self.assertTrue(math.isfinite(prediction))
 
 	def test_owner_can_estimate_without_saving_and_rents_remain_separate(self):
@@ -113,7 +102,10 @@ class RentPredictionIntegrationTests(unittest.TestCase):
 	def test_renter_prediction_page_calls_model_and_displays_monthly_inr(self):
 		sample = self._features_from_row(self.complete_data.iloc[0])
 		page_data = pd.DataFrame([sample])
-		with patch("frontend.pages.rent_prediction.predict_rent", return_value=24_567.0) as estimate:
+		with patch("frontend.pages.rent_prediction.predict_rent_details", return_value={
+			"predicted_rent": 24_567.0, "currency": "INR per month", "model_name": "test",
+			"limitations": "test limitation", "test_metrics": {}, "features": sample,
+		}) as estimate:
 			app = AppTest.from_string(
 				"import pandas as pd\n"
 				"from frontend.pages.renter_workspace import render_prediction\n"
@@ -130,12 +122,13 @@ class RentPredictionIntegrationTests(unittest.TestCase):
 
 		self.assertFalse(app.exception)
 		estimate.assert_called_once()
-		self.assertEqual(estimate.call_args.args[0], sample)
+		for key, value in sample.items():
+			self.assertEqual(estimate.call_args.args[0][key], value)
 		self.assertTrue(any(metric.label == "Model estimate" and metric.value == "₹24,567 INR" for metric in app.metric))
 
 	def test_renter_prediction_page_rejects_missing_area_without_calling_model(self):
 		sample = self._features_from_row(self.complete_data.iloc[0])
-		with patch("frontend.pages.rent_prediction.predict_rent") as estimate:
+		with patch("frontend.pages.rent_prediction.predict_rent_details") as estimate:
 			app = AppTest.from_string(
 				"import pandas as pd\n"
 				"from frontend.pages.renter_workspace import render_prediction\n"

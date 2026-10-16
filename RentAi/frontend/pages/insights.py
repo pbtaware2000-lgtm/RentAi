@@ -10,7 +10,7 @@ from frontend.components.data_utils import numeric_column, page_heading
 from ml.clustering.kmeans import cluster_properties
 from ml.classification.evaluate_model import get_evaluation_results as evaluate_classification
 from ml.regression.evaluate_model import evaluate_model as evaluate_regression
-from ml.regression.rent_model import DATASET_PATH
+from ml.pipelines import ARTIFACT_DIR
 
 
 FEATURE_NAMES = {
@@ -201,8 +201,8 @@ def _render_regression_results() -> None:
 	if regression_topic is None:
 		return
 	try:
-		stat = Path(DATASET_PATH).stat()
-		regression = _regression_results((stat.st_mtime_ns, stat.st_size), result_schema=2)
+		stat = (ARTIFACT_DIR / "model_report.json").stat()
+		regression = _regression_results((stat.st_mtime_ns, stat.st_size), result_schema=3)
 		if regression_topic == regression_topics[0]:
 			st.markdown("**Mean Absolute Error (MAE)**")
 			st.metric("Value", f"\u20b9{regression['mae']:,.2f}")

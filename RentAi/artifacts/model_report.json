@@ -1,0 +1,1490 @@
+{
+  "trained_at_utc": "2026-10-16T09:28:26.126197+00:00",
+  "random_seed": 42,
+  "dataset": "C:\\Users\\Omkar\\OneDrive\\Desktop\\updated\\RentAi\\RentAi\\data\\rentai_dataset.csv",
+  "dataset_sha256": "8519ac388c286cb2dc802dec14da25feef6b779c737e4966ba68de6d33ded9ce",
+  "dataset_quality": {
+    "rows": 10000,
+    "columns": 33,
+    "duplicate_rows": 0,
+    "duplicate_property_records": 0,
+    "missing_by_column": {
+      "property_id": 0,
+      "city": 0,
+      "locality": 0,
+      "property_type": 0,
+      "area_sqft": 0,
+      "bedrooms": 0,
+      "bathrooms": 0,
+      "balcony": 0,
+      "floor": 0,
+      "total_floors": 0,
+      "furnishing_status": 0,
+      "parking": 0,
+      "lift": 0,
+      "gym": 0,
+      "security": 0,
+      "power_backup": 0,
+      "swimming_pool": 0,
+      "air_conditioning": 0,
+      "water_supply": 0,
+      "gated_community": 0,
+      "age_of_property": 0,
+      "distance_to_city_center_km": 0,
+      "distance_to_metro_km": 0,
+      "distance_to_school_km": 0,
+      "distance_to_hospital_km": 0,
+      "distance_to_it_park_km": 0,
+      "posted_date": 0,
+      "available_from": 0,
+      "rent": 0,
+      "rent_category": 0,
+      "security_deposit": 0,
+      "maintenance": 0,
+      "cluster_id": 0
+    },
+    "unique_by_column": {
+      "property_id": 10000,
+      "city": 8,
+      "locality": 47,
+      "property_type": 4,
+      "area_sqft": 2206,
+      "bedrooms": 5,
+      "bathrooms": 6,
+      "balcony": 4,
+      "floor": 31,
+      "total_floors": 28,
+      "furnishing_status": 3,
+      "parking": 3,
+      "lift": 2,
+      "gym": 2,
+      "security": 2,
+      "power_backup": 2,
+      "swimming_pool": 2,
+      "air_conditioning": 2,
+      "water_supply": 3,
+      "gated_community": 2,
+      "age_of_property": 25,
+      "distance_to_city_center_km": 2347,
+      "distance_to_metro_km": 362,
+      "distance_to_school_km": 520,
+      "distance_to_hospital_km": 662,
+      "distance_to_it_park_km": 885,
+      "posted_date": 639,
+      "available_from": 678,
+      "rent": 8295,
+      "rent_category": 4,
+      "security_deposit": 9584,
+      "maintenance": 2705,
+      "cluster_id": 1
+    },
+    "dtypes": {
+      "property_id": "str",
+      "city": "str",
+      "locality": "str",
+      "property_type": "str",
+      "area_sqft": "int64",
+      "bedrooms": "int64",
+      "bathrooms": "int64",
+      "balcony": "int64",
+      "floor": "int64",
+      "total_floors": "int64",
+      "furnishing_status": "str",
+      "parking": "int64",
+      "lift": "str",
+      "gym": "str",
+      "security": "str",
+      "power_backup": "str",
+      "swimming_pool": "str",
+      "air_conditioning": "str",
+      "water_supply": "str",
+      "gated_community": "str",
+      "age_of_property": "int64",
+      "distance_to_city_center_km": "float64",
+      "distance_to_metro_km": "float64",
+      "distance_to_school_km": "float64",
+      "distance_to_hospital_km": "float64",
+      "distance_to_it_park_km": "float64",
+      "posted_date": "str",
+      "available_from": "str",
+      "rent": "int64",
+      "rent_category": "str",
+      "security_deposit": "int64",
+      "maintenance": "int64",
+      "cluster_id": "int64"
+    },
+    "invalid_nonpositive": {
+      "rent": 0,
+      "area_sqft": 0
+    },
+    "numeric_summary": {
+      "area_sqft": {
+        "mean": 1284.6563,
+        "median": 1219.0,
+        "std": 553.4147359415954,
+        "skew": 0.6607918895749201,
+        "p01": 422.0,
+        "p99": 2810.01,
+        "iqr_outlier_count": 89
+      },
+      "bedrooms": {
+        "mean": 2.2772,
+        "median": 2.0,
+        "std": 0.9672919545682871,
+        "skew": 0.45678364304696195,
+        "p01": 1.0,
+        "p99": 5.0,
+        "iqr_outlier_count": 168
+      },
+      "bathrooms": {
+        "mean": 2.3195,
+        "median": 2.0,
+        "std": 1.0780241015841712,
+        "skew": 0.5618571539598034,
+        "p01": 1.0,
+        "p99": 5.0,
+        "iqr_outlier_count": 0
+      },
+      "balcony": {
+        "mean": 1.3655,
+        "median": 1.0,
+        "std": 1.0744418050872984,
+        "skew": 0.13272045954244902,
+        "p01": 0.0,
+        "p99": 3.0,
+        "iqr_outlier_count": 0
+      },
+      "floor": {
+        "mean": 8.2742,
+        "median": 7.0,
+        "std": 6.870118937356277,
+        "skew": 0.8769162134614927,
+        "p01": 0.0,
+        "p99": 27.0,
+        "iqr_outlier_count": 174
+      },
+      "total_floors": {
+        "mean": 16.5119,
+        "median": 17.0,
+        "std": 8.065454949744288,
+        "skew": -0.006223172481852396,
+        "p01": 3.0,
+        "p99": 30.0,
+        "iqr_outlier_count": 0
+      },
+      "parking": {
+        "mean": 0.8456,
+        "median": 1.0,
+        "std": 0.5777490972748812,
+        "skew": 0.020118774951307594,
+        "p01": 0.0,
+        "p99": 2.0,
+        "iqr_outlier_count": 0
+      },
+      "age_of_property": {
+        "mean": 12.0416,
+        "median": 12.0,
+        "std": 7.192304384843318,
+        "skew": -0.005327287567396457,
+        "p01": 0.0,
+        "p99": 24.0,
+        "iqr_outlier_count": 0
+      },
+      "distance_to_city_center_km": {
+        "mean": 11.097199,
+        "median": 10.5,
+        "std": 5.800384014000279,
+        "skew": 0.6014509564278452,
+        "p01": 1.0,
+        "p99": 26.920300000000008,
+        "iqr_outlier_count": 138
+      },
+      "distance_to_metro_km": {
+        "mean": 1.3716469999999998,
+        "median": 1.35,
+        "std": 0.7509405226500004,
+        "skew": 0.27532409943194097,
+        "p01": 0.1,
+        "p99": 3.18,
+        "iqr_outlier_count": 38
+      },
+      "distance_to_school_km": {
+        "mean": 1.415023,
+        "median": 1.17,
+        "std": 1.0136560705357283,
+        "skew": 1.463290929544821,
+        "p01": 0.2,
+        "p99": 4.78,
+        "iqr_outlier_count": 350
+      },
+      "distance_to_hospital_km": {
+        "mean": 1.973583,
+        "median": 1.68,
+        "std": 1.3201330945210505,
+        "skew": 1.2920375085305043,
+        "p01": 0.2,
+        "p99": 6.200400000000009,
+        "iqr_outlier_count": 313
+      },
+      "distance_to_it_park_km": {
+        "mean": 3.162804,
+        "median": 2.9850000000000003,
+        "std": 2.1574920010877157,
+        "skew": 0.6106763116969356,
+        "p01": 0.5,
+        "p99": 8.82,
+        "iqr_outlier_count": 39
+      },
+      "rent": {
+        "mean": 21801.2695,
+        "median": 19780.5,
+        "std": 10711.053403674701,
+        "skew": 1.438824199995218,
+        "p01": 7000.0,
+        "p99": 59362.35000000003,
+        "iqr_outlier_count": 362
+      },
+      "security_deposit": {
+        "mean": 76527.9474,
+        "median": 66941.5,
+        "std": 43671.56616471364,
+        "skew": 1.6949547860339045,
+        "p01": 18263.36,
+        "p99": 231876.56000000008,
+        "iqr_outlier_count": 411
+      },
+      "maintenance": {
+        "mean": 1525.7875,
+        "median": 1346.0,
+        "std": 847.2395602372408,
+        "skew": 1.6522187551794747,
+        "p01": 500.0,
+        "p99": 4466.130000000003,
+        "iqr_outlier_count": 370
+      },
+      "cluster_id": {
+        "mean": -1.0,
+        "median": -1.0,
+        "std": 0.0,
+        "skew": 0.0,
+        "p01": -1.0,
+        "p99": -1.0,
+        "iqr_outlier_count": 0
+      }
+    },
+    "categorical_frequencies": {
+      "property_id": {
+        "RENT100001": 1,
+        "RENT100002": 1,
+        "RENT100003": 1,
+        "RENT100004": 1,
+        "RENT100005": 1,
+        "RENT100006": 1,
+        "RENT100007": 1,
+        "RENT100008": 1,
+        "RENT100009": 1,
+        "RENT100010": 1,
+        "RENT100011": 1,
+        "RENT100012": 1,
+        "RENT100013": 1,
+        "RENT100014": 1,
+        "RENT100015": 1,
+        "RENT100016": 1,
+        "RENT100017": 1,
+        "RENT100018": 1,
+        "RENT100019": 1,
+        "RENT100020": 1,
+        "RENT100021": 1,
+        "RENT100022": 1,
+        "RENT100023": 1,
+        "RENT100024": 1,
+        "RENT100025": 1,
+        "RENT100026": 1,
+        "RENT100027": 1,
+        "RENT100028": 1,
+        "RENT100029": 1,
+        "RENT100030": 1,
+        "RENT100031": 1,
+        "RENT100032": 1,
+        "RENT100033": 1,
+        "RENT100034": 1,
+        "RENT100035": 1,
+        "RENT100036": 1,
+        "RENT100037": 1,
+        "RENT100038": 1,
+        "RENT100039": 1,
+        "RENT100040": 1,
+        "RENT100041": 1,
+        "RENT100042": 1,
+        "RENT100043": 1,
+        "RENT100044": 1,
+        "RENT100045": 1,
+        "RENT100046": 1,
+        "RENT100047": 1,
+        "RENT100048": 1,
+        "RENT100049": 1,
+        "RENT100050": 1,
+        "RENT100051": 1,
+        "RENT100052": 1,
+        "RENT100053": 1,
+        "RENT100054": 1,
+        "RENT100055": 1,
+        "RENT100056": 1,
+        "RENT100057": 1,
+        "RENT100058": 1,
+        "RENT100059": 1,
+        "RENT100060": 1,
+        "RENT100061": 1,
+        "RENT100062": 1,
+        "RENT100063": 1,
+        "RENT100064": 1,
+        "RENT100065": 1,
+        "RENT100066": 1,
+        "RENT100067": 1,
+        "RENT100068": 1,
+        "RENT100069": 1,
+        "RENT100070": 1,
+        "RENT100071": 1,
+        "RENT100072": 1,
+        "RENT100073": 1,
+        "RENT100074": 1,
+        "RENT100075": 1,
+        "RENT100076": 1,
+        "RENT100077": 1,
+        "RENT100078": 1,
+        "RENT100079": 1,
+        "RENT100080": 1,
+        "RENT100081": 1,
+        "RENT100082": 1,
+        "RENT100083": 1,
+        "RENT100084": 1,
+        "RENT100085": 1,
+        "RENT100086": 1,
+        "RENT100087": 1,
+        "RENT100088": 1,
+        "RENT100089": 1,
+        "RENT100090": 1,
+        "RENT100091": 1,
+        "RENT100092": 1,
+        "RENT100093": 1,
+        "RENT100094": 1,
+        "RENT100095": 1,
+        "RENT100096": 1,
+        "RENT100097": 1,
+        "RENT100098": 1,
+        "RENT100099": 1,
+        "RENT100100": 1
+      },
+      "city": {
+        "Ahmedabad": 1266,
+        "Delhi": 1260,
+        "Bengaluru": 1256,
+        "Pune": 1253,
+        "Hyderabad": 1248,
+        "Mumbai": 1244,
+        "Kolkata": 1239,
+        "Chennai": 1234
+      },
+      "locality": {
+        "Satellite": 334,
+        "New Town": 331,
+        "SG Highway": 322,
+        "Rajarhat": 318,
+        "Prahlad Nagar": 310,
+        "Ballygunge": 309,
+        "Bopal": 300,
+        "Salt Lake": 281,
+        "Porur": 263,
+        "Anna Nagar": 247,
+        "Adyar": 245,
+        "OMR": 242,
+        "Velachery": 237,
+        "Dwarka": 234,
+        "Kondapur": 228,
+        "Madhapur": 227,
+        "Thane": 227,
+        "Marathahalli": 226,
+        "Whitefield": 226,
+        "Andheri": 225,
+        "Noida Sector 62": 223,
+        "Vasant Kunj": 210,
+        "Gurgaon Sector 44": 208,
+        "Hitech City": 207,
+        "HSR Layout": 206,
+        "Bandra": 205,
+        "Goregaon": 203,
+        "Banjara Hills": 203,
+        "Koramangala": 202,
+        "Indiranagar": 199,
+        "Gachibowli": 199,
+        "Powai": 198,
+        "Electronic City": 197,
+        "Saket": 196,
+        "Rohini": 189,
+        "Mulund": 186,
+        "Kukatpally": 184,
+        "Aundh": 136,
+        "Kothrud": 132,
+        "Wakad": 131,
+        "Hadapsar": 131,
+        "Kharadi": 129,
+        "Hinjewadi": 127,
+        "Baner": 125,
+        "Magarpatta": 117,
+        "Viman Nagar": 116,
+        "Pimple Saudagar": 109
+      },
+      "property_type": {
+        "Apartment": 7264,
+        "Independent House": 1272,
+        "Studio": 863,
+        "Villa": 601
+      },
+      "furnishing_status": {
+        "Semi-Furnished": 4986,
+        "Fully Furnished": 2805,
+        "Unfurnished": 2209
+      },
+      "lift": {
+        "Yes": 8217,
+        "No": 1783
+      },
+      "gym": {
+        "Yes": 5169,
+        "No": 4831
+      },
+      "security": {
+        "Yes": 7474,
+        "No": 2526
+      },
+      "power_backup": {
+        "Yes": 6010,
+        "No": 3990
+      },
+      "swimming_pool": {
+        "No": 7993,
+        "Yes": 2007
+      },
+      "air_conditioning": {
+        "No": 5534,
+        "Yes": 4466
+      },
+      "water_supply": {
+        "24x7": 7166,
+        "Morning/Evening": 1993,
+        "Limited": 841
+      },
+      "gated_community": {
+        "Yes": 6782,
+        "No": 3218
+      },
+      "posted_date": {
+        "2026-03-09": 29,
+        "2025-02-19": 28,
+        "2026-01-25": 27,
+        "2025-08-23": 26,
+        "2026-05-10": 26,
+        "2025-06-26": 25,
+        "2026-03-24": 25,
+        "2025-05-27": 25,
+        "2025-08-30": 25,
+        "2025-05-19": 25,
+        "2026-06-05": 25,
+        "2026-01-31": 25,
+        "2025-03-20": 25,
+        "2025-09-13": 24,
+        "2026-08-17": 24,
+        "2025-12-11": 24,
+        "2026-05-25": 24,
+        "2025-08-12": 24,
+        "2026-02-22": 23,
+        "2026-08-01": 23,
+        "2025-10-04": 23,
+        "2025-06-06": 23,
+        "2025-02-16": 23,
+        "2026-06-06": 23,
+        "2025-02-08": 23,
+        "2025-11-04": 23,
+        "2025-07-25": 23,
+        "2025-04-08": 23,
+        "2025-06-30": 23,
+        "2025-07-20": 23,
+        "2025-01-12": 23,
+        "2025-12-30": 22,
+        "2025-01-21": 22,
+        "2026-03-08": 22,
+        "2026-04-22": 22,
+        "2026-06-30": 22,
+        "2025-06-04": 22,
+        "2025-04-29": 22,
+        "2025-02-20": 22,
+        "2025-01-08": 22,
+        "2026-04-06": 22,
+        "2025-08-25": 22,
+        "2025-05-16": 22,
+        "2025-11-20": 22,
+        "2026-01-23": 21,
+        "2025-04-17": 21,
+        "2026-01-26": 21,
+        "2026-04-14": 21,
+        "2025-07-07": 21,
+        "2026-03-18": 21,
+        "2026-05-21": 21,
+        "2026-02-13": 21,
+        "2025-05-05": 21,
+        "2025-04-26": 21,
+        "2025-01-11": 21,
+        "2025-02-14": 21,
+        "2025-06-24": 21,
+        "2026-08-05": 21,
+        "2025-12-01": 21,
+        "2025-11-01": 21,
+        "2026-01-13": 21,
+        "2025-05-22": 21,
+        "2026-05-31": 21,
+        "2025-05-08": 21,
+        "2026-06-12": 21,
+        "2025-12-22": 20,
+        "2026-06-22": 20,
+        "2025-12-15": 20,
+        "2025-10-03": 20,
+        "2025-01-10": 20,
+        "2025-01-04": 20,
+        "2026-09-23": 20,
+        "2026-07-21": 20,
+        "2025-01-22": 20,
+        "2025-10-20": 20,
+        "2026-04-08": 20,
+        "2026-07-02": 20,
+        "2026-03-19": 20,
+        "2026-08-28": 20,
+        "2025-04-14": 20,
+        "2026-08-25": 20,
+        "2025-11-24": 20,
+        "2025-05-28": 20,
+        "2025-11-17": 20,
+        "2026-03-13": 20,
+        "2025-09-28": 20,
+        "2025-08-17": 20,
+        "2025-09-12": 20,
+        "2025-09-24": 20,
+        "2025-09-19": 20,
+        "2026-07-27": 20,
+        "2026-04-16": 20,
+        "2025-07-22": 20,
+        "2025-11-12": 20,
+        "2026-03-30": 20,
+        "2026-08-07": 20,
+        "2026-01-11": 20,
+        "2025-07-31": 19,
+        "2026-01-10": 19,
+        "2025-07-08": 19
+      },
+      "available_from": {
+        "2026-01-02": 28,
+        "2025-10-26": 28,
+        "2026-06-03": 27,
+        "2026-09-21": 27,
+        "2026-05-26": 26,
+        "2025-08-24": 26,
+        "2026-09-28": 25,
+        "2026-04-19": 25,
+        "2025-05-24": 25,
+        "2026-04-06": 25,
+        "2026-09-26": 24,
+        "2025-02-18": 24,
+        "2026-03-17": 24,
+        "2026-03-09": 24,
+        "2026-07-12": 24,
+        "2025-06-18": 24,
+        "2025-07-24": 24,
+        "2026-07-17": 23,
+        "2025-06-01": 23,
+        "2026-02-24": 23,
+        "2026-04-04": 23,
+        "2025-07-07": 23,
+        "2025-07-22": 23,
+        "2026-01-26": 23,
+        "2025-10-01": 23,
+        "2025-09-21": 23,
+        "2025-02-22": 23,
+        "2025-10-11": 22,
+        "2026-02-22": 22,
+        "2025-11-04": 22,
+        "2026-01-12": 22,
+        "2025-07-08": 22,
+        "2025-05-27": 22,
+        "2025-07-17": 22,
+        "2025-07-31": 22,
+        "2025-09-23": 22,
+        "2026-09-02": 22,
+        "2026-01-03": 22,
+        "2025-02-27": 22,
+        "2026-02-02": 22,
+        "2026-01-10": 22,
+        "2025-12-30": 22,
+        "2025-03-30": 22,
+        "2025-03-22": 22,
+        "2025-03-16": 22,
+        "2026-06-25": 22,
+        "2025-10-06": 21,
+        "2026-01-09": 21,
+        "2026-08-14": 21,
+        "2026-08-26": 21,
+        "2026-06-22": 21,
+        "2025-12-11": 21,
+        "2026-07-29": 21,
+        "2026-03-23": 21,
+        "2025-09-02": 21,
+        "2026-03-02": 21,
+        "2026-06-06": 21,
+        "2025-09-01": 21,
+        "2025-07-14": 21,
+        "2025-03-08": 21,
+        "2026-02-14": 21,
+        "2026-04-24": 21,
+        "2025-02-16": 21,
+        "2025-02-28": 21,
+        "2026-04-12": 21,
+        "2025-11-07": 21,
+        "2025-07-12": 21,
+        "2025-09-13": 21,
+        "2026-05-04": 21,
+        "2025-09-07": 21,
+        "2026-09-14": 21,
+        "2026-02-25": 20,
+        "2025-09-18": 20,
+        "2026-01-19": 20,
+        "2025-07-16": 20,
+        "2025-05-09": 20,
+        "2025-04-16": 20,
+        "2026-03-25": 20,
+        "2025-08-10": 20,
+        "2025-06-15": 20,
+        "2026-06-01": 20,
+        "2025-11-01": 20,
+        "2026-05-17": 20,
+        "2025-12-01": 20,
+        "2026-03-03": 20,
+        "2026-08-29": 20,
+        "2025-11-20": 20,
+        "2025-06-16": 20,
+        "2026-03-22": 20,
+        "2026-05-09": 20,
+        "2026-03-21": 20,
+        "2025-06-02": 20,
+        "2026-04-05": 20,
+        "2026-02-27": 20,
+        "2025-02-25": 20,
+        "2026-06-23": 20,
+        "2026-02-12": 20,
+        "2025-09-22": 20,
+        "2025-04-02": 20,
+        "2026-04-20": 20
+      },
+      "rent_category": {
+        "Medium": 2500,
+        "Premium": 2500,
+        "High": 2500,
+        "Low": 2500
+      }
+    },
+    "target_leakage_columns": [
+      "rent",
+      "rent_category",
+      "cluster_id"
+    ],
+    "city_coverage": 8,
+    "locality_coverage": 47,
+    "property_type_coverage": 4,
+    "furnishing_status_coverage": 3,
+    "rent_category_coverage": 4,
+    "cluster_id_coverage": 1
+  },
+  "regression": {
+    "selected_model": "ridge",
+    "validation_comparison": {
+      "dummy_median": {
+        "mae": 6509.342817349781,
+        "rmse": 8208.970402925343,
+        "r2": -0.11821729027259464,
+        "median_absolute_error": 5387.5
+      },
+      "ridge": {
+        "mae": 2590.8915983867632,
+        "rmse": 3272.71513727131,
+        "r2": 0.8222681612581335,
+        "median_absolute_error": 2146.939193421502
+      },
+      "random_forest": {
+        "mae": 4401.197458888199,
+        "rmse": 5405.458617943992,
+        "r2": 0.515142723883164,
+        "median_absolute_error": 3917.364426984128
+      },
+      "gradient_boosting": {
+        "mae": 4399.27468238401,
+        "rmse": 5478.099958057305,
+        "r2": 0.5020236375477785,
+        "median_absolute_error": 3851.2391924480326
+      },
+      "xgboost": {
+        "mae": 3433.568603515625,
+        "rmse": 4280.772593819952,
+        "r2": 0.6959162950515747,
+        "median_absolute_error": 2896.3359375
+      }
+    },
+    "test_metrics": {
+      "mae": 5589.995952709013,
+      "rmse": 6941.81519768811,
+      "r2": 0.3584986172305147,
+      "median_absolute_error": 4739.592798728096,
+      "feature_importance": [
+        {
+          "feature": "categorical__city_Mumbai",
+          "importance": 12908.98539722981
+        },
+        {
+          "feature": "categorical__locality_Bandra",
+          "importance": 7658.927342148483
+        },
+        {
+          "feature": "categorical__city_Ahmedabad",
+          "importance": 5706.262810797895
+        },
+        {
+          "feature": "categorical__property_type_Villa",
+          "importance": 5566.041472730923
+        },
+        {
+          "feature": "categorical__property_type_Studio",
+          "importance": 4046.448742216072
+        },
+        {
+          "feature": "categorical__furnishing_status_Fully Furnished",
+          "importance": 3926.9587202215876
+        },
+        {
+          "feature": "categorical__city_Chennai",
+          "importance": 3776.147388893112
+        },
+        {
+          "feature": "categorical__furnishing_status_Unfurnished",
+          "importance": 3704.9368170594485
+        },
+        {
+          "feature": "categorical__city_Hyderabad",
+          "importance": 2909.237654063801
+        },
+        {
+          "feature": "numeric__area_sqft",
+          "importance": 2584.7068613740184
+        },
+        {
+          "feature": "categorical__locality_Andheri",
+          "importance": 2560.72665742194
+        },
+        {
+          "feature": "numeric__bedrooms",
+          "importance": 2516.4087312834395
+        },
+        {
+          "feature": "categorical__locality_Powai",
+          "importance": 2369.979697123756
+        },
+        {
+          "feature": "categorical__locality_Gurgaon Sector 44",
+          "importance": 2025.8518133986934
+        },
+        {
+          "feature": "categorical__property_type_Apartment",
+          "importance": 1820.2643777791914
+        },
+        {
+          "feature": "categorical__locality_SG Highway",
+          "importance": 1621.9840935088305
+        },
+        {
+          "feature": "categorical__locality_Porur",
+          "importance": 1589.125760423594
+        },
+        {
+          "feature": "categorical__locality_Kukatpally",
+          "importance": 1579.1948738677752
+        },
+        {
+          "feature": "categorical__locality_Bopal",
+          "importance": 1399.16760328828
+        },
+        {
+          "feature": "categorical__locality_Prahlad Nagar",
+          "importance": 1379.2934997804334
+        }
+      ],
+      "listing_rent_screen": {
+        "above_estimate_by_more_than_10pct": 589,
+        "below_estimate_by_more_than_10pct": 1342,
+        "within_10pct": 564,
+        "records": 2495,
+        "threshold": "Dataset rent compared with held-out predicted rent; 10% is a screening threshold, not verified overpricing/underpricing."
+      }
+    },
+    "test_error_breakdown": {
+      "city": {
+        "Bengaluru": {
+          "count": 1256,
+          "mae": 3110.994343770781
+        },
+        "Kolkata": {
+          "count": 1239,
+          "mae": 8103.0113044656055
+        }
+      },
+      "locality": {
+        "Ballygunge": {
+          "count": 309,
+          "mae": 7429.169644078009
+        },
+        "Electronic City": {
+          "count": 197,
+          "mae": 2410.4879177942153
+        },
+        "HSR Layout": {
+          "count": 206,
+          "mae": 3117.6410449964083
+        },
+        "Indiranagar": {
+          "count": 199,
+          "mae": 4240.619709993981
+        },
+        "Koramangala": {
+          "count": 202,
+          "mae": 3660.8177139581335
+        },
+        "Marathahalli": {
+          "count": 226,
+          "mae": 2687.2745842638474
+        },
+        "New Town": {
+          "count": 331,
+          "mae": 8246.156573683875
+        },
+        "Rajarhat": {
+          "count": 318,
+          "mae": 8634.363551154125
+        },
+        "Salt Lake": {
+          "count": 281,
+          "mae": 8074.064594506786
+        },
+        "Whitefield": {
+          "count": 226,
+          "mae": 2653.1688679177273
+        }
+      },
+      "property_type": {
+        "Apartment": {
+          "count": 1821,
+          "mae": 5562.835379604282
+        },
+        "Independent House": {
+          "count": 327,
+          "mae": 6626.256766333424
+        },
+        "Studio": {
+          "count": 218,
+          "mae": 3154.5148482030395
+        },
+        "Villa": {
+          "count": 129,
+          "mae": 7462.375784886025
+        }
+      },
+      "rent_range": {
+        "<=15k": {
+          "count": 845,
+          "mae": 6231.460756944733
+        },
+        "15k-25k": {
+          "count": 1037,
+          "mae": 5698.282861059519
+        },
+        "25k-40k": {
+          "count": 553,
+          "mae": 4271.941091275722
+        },
+        ">40k": {
+          "count": 60,
+          "mae": 6832.5468666082215
+        }
+      }
+    },
+    "train_records": 4992,
+    "validation_records": 2513,
+    "test_records": 2495,
+    "split_method": "city-grouped train/validation/test (unseen-city generalization; only observed cities)",
+    "target_filter": "Rows with missing, non-numeric, or non-positive rent excluded; no other target outlier filtering.",
+    "features": [
+      "city",
+      "locality",
+      "property_type",
+      "area_sqft",
+      "bedrooms",
+      "bathrooms",
+      "balcony",
+      "floor",
+      "total_floors",
+      "furnishing_status",
+      "parking",
+      "lift",
+      "gym",
+      "security",
+      "power_backup",
+      "swimming_pool",
+      "air_conditioning",
+      "water_supply",
+      "gated_community",
+      "age_of_property",
+      "distance_to_city_center_km",
+      "distance_to_metro_km",
+      "distance_to_school_km",
+      "distance_to_hospital_km",
+      "distance_to_it_park_km"
+    ],
+    "currency": "INR per month",
+    "diagnostic_plots": [
+      "regression_actual_predicted_residuals.png"
+    ],
+    "model_parameters": {
+      "alpha": 10.0,
+      "copy_X": true,
+      "fit_intercept": true,
+      "max_iter": null,
+      "positive": false,
+      "random_state": null,
+      "solver": "auto",
+      "tol": 0.0001
+    }
+  },
+  "classification": {
+    "selected_model": "logistic_regression",
+    "validation_comparison": {
+      "dummy_prior": {
+        "accuracy": 0.25,
+        "macro_f1": 0.1,
+        "weighted_f1": 0.1
+      },
+      "logistic_regression": {
+        "accuracy": 0.731875,
+        "macro_f1": 0.7310227079003468,
+        "weighted_f1": 0.7310227079003468
+      },
+      "decision_tree": {
+        "accuracy": 0.6225,
+        "macro_f1": 0.6239690822845065,
+        "weighted_f1": 0.6239690822845065
+      },
+      "random_forest": {
+        "accuracy": 0.68875,
+        "macro_f1": 0.6861556294530576,
+        "weighted_f1": 0.6861556294530575
+      },
+      "gradient_boosting": {
+        "accuracy": 0.650625,
+        "macro_f1": 0.6488539959988999,
+        "weighted_f1": 0.6488539959988998
+      }
+    },
+    "test_metrics": {
+      "accuracy": 0.7275,
+      "macro_f1": 0.7293594059328316,
+      "weighted_f1": 0.7293594059328316,
+      "per_class": {
+        "High": {
+          "precision": 0.6463654223968566,
+          "recall": 0.658,
+          "f1-score": 0.6521308225966304,
+          "support": 500.0
+        },
+        "Low": {
+          "precision": 0.8232758620689655,
+          "recall": 0.764,
+          "f1-score": 0.7925311203319502,
+          "support": 500.0
+        },
+        "Medium": {
+          "precision": 0.5856873822975518,
+          "recall": 0.622,
+          "f1-score": 0.6032977691561591,
+          "support": 500.0
+        },
+        "Premium": {
+          "precision": 0.8729838709677419,
+          "recall": 0.866,
+          "f1-score": 0.8694779116465864,
+          "support": 500.0
+        },
+        "accuracy": 0.7275,
+        "macro avg": {
+          "precision": 0.732078134432779,
+          "recall": 0.7275,
+          "f1-score": 0.7293594059328316,
+          "support": 2000.0
+        },
+        "weighted avg": {
+          "precision": 0.7320781344327789,
+          "recall": 0.7275,
+          "f1-score": 0.7293594059328316,
+          "support": 2000.0
+        }
+      },
+      "labels": [
+        "High",
+        "Low",
+        "Medium",
+        "Premium"
+      ],
+      "confusion_matrix": [
+        [
+          329,
+          4,
+          106,
+          61
+        ],
+        [
+          6,
+          382,
+          112,
+          0
+        ],
+        [
+          109,
+          78,
+          311,
+          2
+        ],
+        [
+          65,
+          0,
+          2,
+          433
+        ]
+      ],
+      "test_records": 2000,
+      "train_records": 8000,
+      "class_distribution": {
+        "Medium": 2500,
+        "Premium": 2500,
+        "High": 2500,
+        "Low": 2500
+      },
+      "scenario": "Predict rent category from property and location characteristics before the rent is known; rent, rent-derived financial fields, property_id, and existing cluster_id are excluded.",
+      "features": [
+        "city",
+        "locality",
+        "property_type",
+        "area_sqft",
+        "bedrooms",
+        "bathrooms",
+        "balcony",
+        "floor",
+        "total_floors",
+        "furnishing_status",
+        "parking",
+        "lift",
+        "gym",
+        "security",
+        "power_backup",
+        "swimming_pool",
+        "air_conditioning",
+        "water_supply",
+        "gated_community",
+        "age_of_property",
+        "distance_to_city_center_km",
+        "distance_to_metro_km",
+        "distance_to_school_km",
+        "distance_to_hospital_km",
+        "distance_to_it_park_km"
+      ],
+      "random_seed": 42,
+      "model_parameters": {
+        "C": 1.0,
+        "class_weight": "balanced",
+        "dual": false,
+        "fit_intercept": true,
+        "intercept_scaling": 1,
+        "l1_ratio": 0.0,
+        "max_iter": 1000,
+        "n_jobs": null,
+        "penalty": "deprecated",
+        "random_state": 42,
+        "solver": "lbfgs",
+        "tol": 0.0001,
+        "verbose": 0,
+        "warm_start": false
+      },
+      "feature_importance": [
+        {
+          "feature": "categorical__city_Mumbai",
+          "importance": 3.8028738378357985
+        },
+        {
+          "feature": "categorical__city_Kolkata",
+          "importance": 2.748988037211323
+        },
+        {
+          "feature": "categorical__city_Ahmedabad",
+          "importance": 2.311110233287001
+        },
+        {
+          "feature": "categorical__property_type_Villa",
+          "importance": 2.0537576534899857
+        },
+        {
+          "feature": "categorical__property_type_Studio",
+          "importance": 2.045515947023899
+        },
+        {
+          "feature": "categorical__furnishing_status_Fully Furnished",
+          "importance": 1.6888879048003926
+        },
+        {
+          "feature": "categorical__furnishing_status_Unfurnished",
+          "importance": 1.6452378226655884
+        },
+        {
+          "feature": "categorical__city_Bengaluru",
+          "importance": 1.2955366500492582
+        },
+        {
+          "feature": "categorical__locality_Bandra",
+          "importance": 1.1799109027580197
+        },
+        {
+          "feature": "numeric__bedrooms",
+          "importance": 1.0386141495504262
+        },
+        {
+          "feature": "categorical__locality_New Town",
+          "importance": 1.0233998985578812
+        },
+        {
+          "feature": "categorical__city_Chennai",
+          "importance": 0.9772202768753521
+        },
+        {
+          "feature": "categorical__locality_SG Highway",
+          "importance": 0.9397493778285404
+        },
+        {
+          "feature": "numeric__area_sqft",
+          "importance": 0.9185387197113563
+        },
+        {
+          "feature": "categorical__locality_Gurgaon Sector 44",
+          "importance": 0.8873278204125667
+        },
+        {
+          "feature": "categorical__locality_Rajarhat",
+          "importance": 0.8580788530377481
+        },
+        {
+          "feature": "categorical__city_Delhi",
+          "importance": 0.8534667829405624
+        },
+        {
+          "feature": "categorical__locality_Bopal",
+          "importance": 0.7897529363966218
+        },
+        {
+          "feature": "categorical__locality_Indiranagar",
+          "importance": 0.7715774144993568
+        },
+        {
+          "feature": "categorical__locality_Porur",
+          "importance": 0.6637013105120615
+        }
+      ]
+    }
+  },
+  "clustering": {
+    "selected_k": 5,
+    "candidate_metrics": [
+      {
+        "k": 2,
+        "silhouette": 0.10601595521428143,
+        "stability_ari": 0.9599648458350384,
+        "inertia": 177993.74075207344,
+        "cluster_sizes": [
+          5783,
+          4217
+        ]
+      },
+      {
+        "k": 3,
+        "silhouette": 0.10122056501534298,
+        "stability_ari": 0.5582380657478497,
+        "inertia": 165871.12318631177,
+        "cluster_sizes": [
+          1853,
+          3442,
+          4705
+        ]
+      },
+      {
+        "k": 4,
+        "silhouette": 0.12908546525360448,
+        "stability_ari": 0.3539412825869513,
+        "inertia": 154175.1766417158,
+        "cluster_sizes": [
+          3248,
+          863,
+          1120,
+          4769
+        ]
+      },
+      {
+        "k": 5,
+        "silhouette": 0.16035038613727098,
+        "stability_ari": 0.8005837823531446,
+        "inertia": 144146.6632149727,
+        "cluster_sizes": [
+          1101,
+          3994,
+          2231,
+          1811,
+          863
+        ]
+      },
+      {
+        "k": 6,
+        "silhouette": 0.14576551387537778,
+        "stability_ari": 0.24009165070390312,
+        "inertia": 134833.4415893467,
+        "cluster_sizes": [
+          863,
+          1557,
+          3035,
+          1219,
+          1454,
+          1872
+        ]
+      },
+      {
+        "k": 7,
+        "silhouette": 0.15448613871758765,
+        "stability_ari": 0.43329041136023044,
+        "inertia": 125837.51090450617,
+        "cluster_sizes": [
+          865,
+          3278,
+          1000,
+          2223,
+          1170,
+          863,
+          601
+        ]
+      },
+      {
+        "k": 8,
+        "silhouette": 0.26244962148381384,
+        "stability_ari": 0.7865471554095826,
+        "inertia": 115481.96446524584,
+        "cluster_sizes": [
+          1169,
+          1135,
+          2290,
+          1132,
+          863,
+          1126,
+          1148,
+          1137
+        ]
+      }
+    ],
+    "profiles": [
+      {
+        "cluster": 0,
+        "properties": 863,
+        "rent_median": 10919.0,
+        "rent_mean": 12060.243337195829,
+        "area_sqft_median": 619.0,
+        "area_sqft_mean": 617.1320973348784,
+        "bedrooms_median": 1.0,
+        "bedrooms_mean": 1.0,
+        "bathrooms_median": 1.0,
+        "bathrooms_mean": 1.1900347624565468,
+        "common_city": {
+          "Pune": 118,
+          "Bengaluru": 116,
+          "Mumbai": 112
+        },
+        "common_locality": {
+          "Prahlad Nagar": 30,
+          "Porur": 27,
+          "New Town": 27
+        },
+        "common_property_type": {
+          "Studio": 863
+        },
+        "common_furnishing_status": {
+          "Semi-Furnished": 430,
+          "Fully Furnished": 255,
+          "Unfurnished": 178
+        }
+      },
+      {
+        "cluster": 1,
+        "properties": 4138,
+        "rent_median": 16378.0,
+        "rent_mean": 16761.195746737554,
+        "area_sqft_median": 1057.0,
+        "area_sqft_mean": 1007.7725954567424,
+        "bedrooms_median": 2.0,
+        "bedrooms_mean": 1.764862252295795,
+        "bathrooms_median": 2.0,
+        "bathrooms_mean": 1.791203479942001,
+        "common_city": {
+          "Ahmedabad": 634,
+          "Delhi": 607,
+          "Hyderabad": 592
+        },
+        "common_locality": {
+          "SG Highway": 167,
+          "Satellite": 167,
+          "Ballygunge": 158
+        },
+        "common_property_type": {
+          "Apartment": 3830,
+          "Villa": 308
+        },
+        "common_furnishing_status": {
+          "Semi-Furnished": 2013,
+          "Fully Furnished": 1124,
+          "Unfurnished": 1001
+        }
+      },
+      {
+        "cluster": 2,
+        "properties": 2780,
+        "rent_median": 24614.5,
+        "rent_mean": 25226.810431654678,
+        "area_sqft_median": 1769.0,
+        "area_sqft_mean": 1836.1345323741007,
+        "bedrooms_median": 3.0,
+        "bedrooms_mean": 3.3122302158273382,
+        "bathrooms_median": 3.0,
+        "bathrooms_mean": 3.352158273381295,
+        "common_city": {
+          "Pune": 418,
+          "Chennai": 414,
+          "Bengaluru": 412
+        },
+        "common_locality": {
+          "New Town": 108,
+          "Satellite": 107,
+          "Rajarhat": 102
+        },
+        "common_property_type": {
+          "Apartment": 2542,
+          "Villa": 226,
+          "Independent House": 12
+        },
+        "common_furnishing_status": {
+          "Semi-Furnished": 1430,
+          "Fully Furnished": 803,
+          "Unfurnished": 547
+        }
+      },
+      {
+        "cluster": 3,
+        "properties": 1062,
+        "rent_median": 39290.5,
+        "rent_mean": 40791.07721280603,
+        "area_sqft_median": 1342.0,
+        "area_sqft_mean": 1420.5866290018832,
+        "bedrooms_median": 2.0,
+        "bedrooms_mean": 2.5235404896421847,
+        "bathrooms_median": 2.0,
+        "bathrooms_mean": 2.5461393596986817,
+        "common_city": {
+          "Mumbai": 1062
+        },
+        "common_locality": {
+          "Andheri": 196,
+          "Thane": 188,
+          "Bandra": 187
+        },
+        "common_property_type": {
+          "Apartment": 892,
+          "Independent House": 103,
+          "Villa": 67
+        },
+        "common_furnishing_status": {
+          "Semi-Furnished": 532,
+          "Fully Furnished": 308,
+          "Unfurnished": 222
+        }
+      },
+      {
+        "cluster": 4,
+        "properties": 1157,
+        "rent_median": 20502.0,
+        "rent_mean": 21431.477960242006,
+        "area_sqft_median": 1260.0,
+        "area_sqft_mean": 1322.9887640449438,
+        "bedrooms_median": 2.0,
+        "bedrooms_mean": 2.3491789109766636,
+        "bathrooms_median": 2.0,
+        "bathrooms_mean": 2.362143474503025,
+        "common_city": {
+          "Kolkata": 174,
+          "Hyderabad": 173,
+          "Delhi": 166
+        },
+        "common_locality": {
+          "New Town": 50,
+          "Rajarhat": 49,
+          "Satellite": 43
+        },
+        "common_property_type": {
+          "Independent House": 1157
+        },
+        "common_furnishing_status": {
+          "Semi-Furnished": 581,
+          "Fully Furnished": 315,
+          "Unfurnished": 261
+        }
+      }
+    ],
+    "features": [
+      "rent",
+      "area_sqft",
+      "bedrooms",
+      "bathrooms",
+      "balcony",
+      "property_type",
+      "furnishing_status",
+      "city"
+    ],
+    "random_seed": 42,
+    "model_parameters": {
+      "algorithm": "lloyd",
+      "copy_x": true,
+      "init": "k-means++",
+      "max_iter": 300,
+      "n_clusters": 5,
+      "n_init": 20,
+      "random_state": 42,
+      "tol": 0.0001,
+      "verbose": 0
+    },
+    "similarity": "Euclidean distance after fitted imputation, one-hot encoding, and standardization; neighbor search excludes the queried row and may filter within the top 100 candidates."
+  },
+  "runtime": {
+    "sklearn": "1.9.1",
+    "pandas": "3.0.6",
+    "numpy": "2.5.4"
+  }
+}

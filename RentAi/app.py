@@ -48,6 +48,7 @@ OWNER_SECTION_RENDERERS = {
     "My Properties": owner_sections.render_properties,
     "Add New Property": owner_sections.render_add_property,
     "Applications & Enquiries": owner_sections.render_enquiries,
+    "Booking Requests": owner_sections.render_booking_requests,
     "Renter List": owner_sections.render_renters,
     "Property Analytics": owner_sections.render_analytics,
     "Revenue & Rent Collection": owner_sections.render_revenue,
@@ -63,8 +64,8 @@ RENTER_SECTION_RENDERERS = {
     "Compare Properties": renter_workspace.render_compare,
     "Saved Properties": renter_workspace.render_saved,
     "My Enquiries": renter_workspace.render_enquiries,
+    "My Bookings": renter_workspace.render_bookings,
     "My Profile": renter_workspace.render_profile,
-    "Settings": renter_workspace.render_settings,
 }
 
 

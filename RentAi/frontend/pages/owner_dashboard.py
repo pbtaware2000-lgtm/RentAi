@@ -8,6 +8,7 @@ import pandas as pd
 import streamlit as st
 
 from frontend.pages.owner_support import load_or_report, money, owner_name
+from frontend.application_api import ApplicationAPIError, bookings as booking_records
 
 
 def calculate_metrics(listings: list[dict], enquiries: list[dict], maintenance: list[dict]) -> dict:
@@ -86,8 +87,15 @@ def render(_data=None) -> None:
 
     st.subheader("Revenue overview")
     revenue = st.columns(4)
+    try:
+        bookings = booking_records()
+        verified_amount = sum(int(item.get("amount_due", 0)) for item in bookings if item.get("payment_status") == "paid") / 100
+        verified_count = sum(item.get("payment_status") == "paid" for item in bookings)
+    except ApplicationAPIError:
+        verified_amount, verified_count = 0, 0
     _metric_card(revenue[0], "Potential monthly rent", money(metrics["potential_monthly_rent"]), "Published asking rents only", "#059669")
-    for column, title in zip(revenue[1:], ("Rent collected", "Outstanding rent", "Income & expenses")):
+    _metric_card(revenue[1], "Verified booking payments", money(verified_amount), f"{verified_count} verified initial payments; not recurring rent", "#60a5fa")
+    for column, title in zip(revenue[2:], ("Outstanding rent", "Income & expenses")):
         _metric_card(column, title, "Not tracked", "Payment and expense records are not stored", "#94a3b8")
 
     st.subheader("Portfolio overview")

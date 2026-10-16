@@ -2,6 +2,7 @@
 
 from fastapi import HTTPException
 import math
+import re
 from datetime import date, datetime, timezone
 
 from backend.auth.dependencies import CurrentUser
@@ -141,7 +142,9 @@ class ApplicationService:
             if isinstance(property_id, bool) or not isinstance(property_id, (str, int)) or not str(property_id).strip() or len(str(property_id)) > 160:
                 raise HTTPException(status_code=400, detail="Favorite must reference a property")
             property_id = str(property_id).strip()
-            source = record_data.get("source", "catalog")
+            # The source is required so legacy or malformed clients cannot silently
+            # turn an ambiguous property reference into a dataset bookmark.
+            source = record_data.get("source")
             if source == "catalog":
                 from backend.services.property_service import get_property_by_id
 
@@ -163,7 +166,7 @@ class ApplicationService:
                 "id", "property_id", "title", "city", "locality", "property_type", "rent",
                 "bedrooms", "bathrooms", "area_sqft", "furnishing_status", "parking",
                 "security_deposit", "maintenance", "available_from", "posted_date", "image_url",
-                "image", "photo_url", "description", "status",
+                "image", "photo_url", "image_path", "description", "status",
             }
             snapshot = {key: value for key, value in prop.items() if key in allowed_fields}
             record_data = {"property_id": property_id, "source": source, "property": snapshot}
@@ -214,6 +217,12 @@ class ApplicationService:
         if record is None:
             raise HTTPException(status_code=404, detail="Record not found")
         self._authorize_record_access(user, record, "delete")
+        if record.get("kind") == "listing":
+            from backend.repositories.sqlite_repository import connect
+            with connect() as db:
+                has_booking_history = db.execute("SELECT 1 FROM bookings WHERE property_id=? LIMIT 1", (record_id,)).fetchone()
+            if has_booking_history:
+                raise HTTPException(status_code=409, detail="This listing has booking history and cannot be deleted. Unpublish it instead.")
         if not self.repository.delete("application_records", record_id):
             raise HTTPException(status_code=404, detail="Record not found")
 
@@ -253,12 +262,25 @@ class ApplicationService:
         occupancy_status = data.get("occupancy_status", "not_tracked")
         if occupancy_status not in {"vacant", "occupied", "not_tracked"}:
             raise HTTPException(status_code=400, detail="Occupancy status is invalid")
-        return {
+        result = {
             "title": title.strip(), "city": city.strip(), "locality": locality.strip(),
             "rent": float(rent), "bedrooms": bedrooms, "property_type": property_type.strip(),
             "description": description.strip(), "status": status,
             "occupancy_status": occupancy_status,
         }
+        image_path = data.get("image_path")
+        if image_path is not None:
+            if not isinstance(image_path, str) or not re.fullmatch(
+                r"assets/property_images/owner_uploads/[0-9a-f]{32}\.jpg", image_path
+            ):
+                raise HTTPException(status_code=400, detail="Listing image path is invalid")
+            result["image_path"] = image_path
+        if "security_deposit" in data:
+            deposit = data.get("security_deposit")
+            if isinstance(deposit, bool) or not isinstance(deposit, (int, float)) or not math.isfinite(float(deposit)) or deposit < 0:
+                raise HTTPException(status_code=400, detail="Security deposit must be a non-negative amount")
+            result["security_deposit"] = float(deposit)
+        return result
 
     @staticmethod
     def _validate_profile_data(data: dict) -> dict:
@@ -287,15 +309,25 @@ class ApplicationService:
                 raise HTTPException(status_code=400, detail="Profile phone number is invalid")
             if not isinstance(preferred_city, str) or len(preferred_city) > 120:
                 raise HTTPException(status_code=400, detail="Preferred city is too long")
-            return {"record_type": record_type, "name": name.strip(), "phone": phone.strip(), "preferred_city": preferred_city.strip()}
-        if record_type == "renter_settings":
-            sort_by = data.get("sort_by", "rent")
-            sort_order = data.get("sort_order", "asc")
-            if sort_by not in {"rent", "area_sqft", "bedrooms"}:
-                raise HTTPException(status_code=400, detail="Unsupported default property sort")
-            if sort_order not in {"asc", "desc"}:
-                raise HTTPException(status_code=400, detail="Unsupported sort order")
-            return {"record_type": record_type, "sort_by": sort_by, "sort_order": sort_order}
+            property_type = data.get("preferred_property_type", "Any")
+            furnishing = data.get("furnishing_preference", "Any")
+            preferred_bhk = data.get("preferred_bhk", "Any")
+            budget_min = data.get("monthly_budget_min")
+            budget_max = data.get("monthly_budget_max")
+            if property_type not in {"Any", "Apartment", "House", "Villa", "Studio", "Other"}:
+                raise HTTPException(status_code=400, detail="Unsupported preferred property type")
+            if furnishing not in {"Any", "Furnished", "Semi-Furnished", "Unfurnished"}:
+                raise HTTPException(status_code=400, detail="Unsupported furnishing preference")
+            if preferred_bhk not in {"Any", "1 BHK", "2 BHK", "3 BHK", "4+ BHK"}:
+                raise HTTPException(status_code=400, detail="Unsupported bedroom preference")
+            for label, value in (("Minimum", budget_min), ("Maximum", budget_max)):
+                if value is not None and (isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)) or value < 0):
+                    raise HTTPException(status_code=400, detail=f"Monthly budget {label.lower()} must be a non-negative amount")
+            if budget_min is not None and budget_max is not None and budget_min > budget_max:
+                raise HTTPException(status_code=400, detail="Monthly budget minimum cannot exceed maximum")
+            return {"record_type": record_type, "name": name.strip(), "phone": phone.strip(), "preferred_city": preferred_city.strip(),
+                    "preferred_property_type": property_type, "monthly_budget_min": budget_min, "monthly_budget_max": budget_max,
+                    "preferred_bhk": preferred_bhk, "furnishing_preference": furnishing}
         if record_type == "owner_settings":
             email_alerts = data.get("email_alerts", True)
             maintenance_alerts = data.get("maintenance_alerts", True)

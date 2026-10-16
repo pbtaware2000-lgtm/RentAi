@@ -1,5 +1,8 @@
 """Dataset quality checks and exploratory charts."""
 
+import json
+from pathlib import Path
+
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -7,6 +10,36 @@ import streamlit as st
 
 from frontend.components.charts import INDIGO, NAVY, ORANGE, style_figure
 from frontend.components.data_utils import page_heading, show_empty
+from ml.data_validation import PROJECT_ROOT, validate_dataset
+
+
+def _render_ml_report() -> None:
+	path = PROJECT_ROOT / "artifacts" / "model_report.json"
+	st.subheader("Saved ML training report")
+	if not path.exists():
+		st.info("No saved evaluation report yet. Run `python -m ml.train` to train and evaluate models.")
+		return
+	try:
+		report = json.loads(path.read_text(encoding="utf-8"))
+	except (OSError, json.JSONDecodeError):
+		st.warning("The saved ML report could not be read. Retrain models to regenerate it.")
+		return
+	st.caption(f"Trained {report.get('trained_at_utc', 'unknown')} · seed {report.get('random_seed')} · dataset SHA-256 {report.get('dataset_sha256', '')[:16]}…")
+	regression = report.get("regression", {})
+	if regression:
+		st.markdown(f"**Regression · selected {regression.get('selected_model')}**")
+		st.dataframe(pd.DataFrame.from_dict(regression.get("validation_comparison", {}), orient="index").rename_axis("Model").reset_index(), hide_index=True, width="stretch")
+		st.json(regression.get("test_metrics", {}), expanded=False)
+	classification = report.get("classification", {})
+	if classification:
+		st.markdown(f"**Classification · selected {classification.get('selected_model')}**")
+		st.dataframe(pd.DataFrame.from_dict(classification.get("validation_comparison", {}), orient="index").rename_axis("Model").reset_index(), hide_index=True, width="stretch")
+		st.json({key: classification.get("test_metrics", {}).get(key) for key in ("accuracy", "macro_f1", "weighted_f1", "labels", "confusion_matrix")}, expanded=False)
+	clustering = report.get("clustering", {})
+	if clustering:
+		st.markdown(f"**Clustering · selected K={clustering.get('selected_k')}**")
+		st.dataframe(pd.DataFrame(clustering.get("candidate_metrics", [])), hide_index=True, width="stretch")
+		st.dataframe(pd.DataFrame(clustering.get("profiles", [])), hide_index=True, width="stretch")
 
 
 def _render_eda_chart(figure: go.Figure, key: str, height: int = 340,
@@ -83,6 +116,13 @@ def render(data: pd.DataFrame) -> None:
 	with st.expander("Data types and missing values", expanded=True):
 		schema = pd.DataFrame({"Column": data.columns, "Data type": data.dtypes.astype(str).values, "Missing": data.isna().sum().values, "Unique": data.nunique(dropna=True).values})
 		st.dataframe(schema, width="stretch", hide_index=True)
+	quality = validate_dataset(data)
+	coverage = {name: quality.get(f"{name}_coverage") for name in ("city", "locality", "property_type", "furnishing_status", "rent_category") if quality.get(f"{name}_coverage") is not None}
+	if coverage:
+		st.caption("Category coverage · " + " · ".join(f"{name}: {count}" for name, count in coverage.items()))
+	invalid = quality.get("invalid_nonpositive", {})
+	if invalid:
+		st.caption("Missing/non-numeric/non-positive counts · " + " · ".join(f"{name}: {count}" for name, count in invalid.items()))
 	with st.expander("Statistical summary"):
 		st.dataframe(data.describe(include="all").transpose().reset_index(names="Column"), width="stretch")
 
@@ -128,3 +168,5 @@ def render(data: pd.DataFrame) -> None:
 			figure = go.Figure(go.Heatmap(z=correlation.to_numpy(), x=correlation.columns, y=correlation.index, colorscale=[[0, INDIGO], [0.5, "#ffffff"], [1, ORANGE]], zmin=-1, zmax=1, colorbar={"title": "Correlation"}, hovertemplate="%{y} × %{x}<br>%{z:.2f}<extra></extra>"))
 			figure.update_layout(xaxis_title="Feature", yaxis_title="Feature")
 			_render_eda_chart(figure, "eda-correlation", height=max(420, 34 * len(correlation.columns)), rotate_x_labels=True, heatmap=True)
+
+	_render_ml_report()

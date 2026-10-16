@@ -3,7 +3,12 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Query
 
-from backend.core.config import startup_configuration_issues
+from backend.core.config import PROJECT_ROOT, startup_configuration_issues
+from dotenv import load_dotenv
+
+# API-only secrets are reloaded here after the shared config filters them from
+# Streamlit's process environment.
+load_dotenv(PROJECT_ROOT / ".env", override=False)
 
 from backend.routes.classification import router as classification_router
 from backend.routes.clustering import router as clustering_router
@@ -12,6 +17,7 @@ from backend.routes.application import auth_router as application_auth_router
 from backend.routes.application import router as application_router
 from backend.routes.images import router as images_router
 from backend.routes.prediction import router as prediction_router
+from backend.routes.bookings import router as bookings_router
 
 from backend.services.property_service import (
     count_matching_properties,
@@ -46,6 +52,7 @@ app.include_router(application_router)
 app.include_router(application_admin_router)
 app.include_router(application_auth_router)
 app.include_router(images_router)
+app.include_router(bookings_router)
 
 
 @app.get("/properties/compare")

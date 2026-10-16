@@ -1,52 +1,21 @@
-"""Recommend listings using nearest-neighbor distances over property features."""
+"""Persisted clustering and fitted-space similar-property recommendations."""
+from functools import lru_cache
 
-import numpy as np
-
-from backend.services.property_service import load_properties
-
-
-NUMERIC_FEATURES = (
-    "rent",
-    "area_sqft",
-    "bedrooms",
-    "bathrooms",
-    "distance_to_city_center_km",
-    "age_of_property",
-)
-CATEGORICAL_WEIGHTS = {
-    "city": 0.5,
-    "locality": 0.75,
-    "property_type": 0.75,
-    "furnishing_status": 0.25,
-}
+from ml.pipelines import load_artifact, recommend_similar
 
 
-def find_similar_properties(property_id: str, limit: int = 5) -> list[dict] | None:
-    """Return the closest dataset listings, excluding the reference listing."""
-    dataset = load_properties()
-    required = {"property_id", *NUMERIC_FEATURES, *CATEGORICAL_WEIGHTS}
-    missing_columns = required.difference(dataset.columns)
-    if missing_columns:
-        raise ValueError(f"Similarity dataset is missing columns: {sorted(missing_columns)}")
+@lru_cache(maxsize=1)
+def _get_model():
+    return load_artifact("clustering")
 
-    matches = dataset.index[dataset["property_id"] == property_id]
-    if len(matches) == 0:
+
+def find_similar_properties(property_id: str | None = None, limit: int = 5, filters: dict | None = None, features: dict | None = None) -> list[dict] | None:
+    try:
+        return recommend_similar(property_id=property_id, features=features, limit=limit, filters=filters, artifact=_get_model())
+    except KeyError:
         return None
 
-    reference_index = matches[0]
-    reference = dataset.loc[reference_index]
-    candidates = dataset.drop(index=reference_index).copy()
-    if candidates.empty:
-        return []
 
-    numeric_values = dataset.loc[:, NUMERIC_FEATURES].astype(float)
-    ranges = numeric_values.max() - numeric_values.min()
-    ranges = ranges.mask(ranges == 0, 1.0)
-    differences = (candidates.loc[:, NUMERIC_FEATURES].astype(float) - reference.loc[list(NUMERIC_FEATURES)].astype(float)) / ranges
-    distances = np.square(differences.to_numpy()).sum(axis=1)
-
-    for column, weight in CATEGORICAL_WEIGHTS.items():
-        distances += (candidates[column].to_numpy() != reference[column]) * weight
-
-    candidates["_similarity_distance"] = distances
-    return candidates.sort_values("_similarity_distance", kind="stable").head(limit).drop(columns="_similarity_distance").to_dict(orient="records")
+def cluster_analytics() -> dict:
+    artifact = _get_model()
+    return {"selected_k": artifact["selected_k"], "candidate_metrics": artifact["candidate_metrics"], "profiles": artifact["profiles"], "features": artifact["features"]}

@@ -8,8 +8,10 @@ from pydantic import ValidationError
 
 from backend.schemas.prediction_schema import RentPredictionRequest
 from backend.services.prediction_service import predict_rent
-from frontend.application_api import ApplicationAPIError, create, delete, records, update
+from frontend.application_api import (ApplicationAPIError, booking_notifications, bookings as booking_records,
+                                      create, decide_booking, delete, records, update)
 from frontend.components.data_utils import category_options
+from frontend.components.property_images import store_owner_image
 from frontend.pages.owner_support import load_or_report, money, owner_name, rows
 
 
@@ -39,6 +41,7 @@ def render_add_property(data=None) -> None:
             rent = rent_col.number_input("Monthly asking rent (₹) *", min_value=1, step=1000, key="owner_add_asking_rent")
             bedrooms = bed_col.number_input("Bedrooms", min_value=1, max_value=30, step=1, key="owner_add_bedrooms")
             occupancy = occupancy_col.selectbox("Occupancy", ["vacant", "occupied", "not_tracked"], format_func=lambda value: {"vacant": "Vacant", "occupied": "Occupied", "not_tracked": "Not tracked"}[value], key="owner_add_occupancy")
+            security_deposit = st.number_input("Security deposit amount", min_value=0, step=5000, key="owner_add_security_deposit")
 
             features_first, features_second, features_third = st.columns(3)
             area_sqft = features_first.number_input("Area (sq ft) for estimate", min_value=0.0, value=0.0, step=50.0, key="owner_add_area_sqft")
@@ -56,6 +59,11 @@ def render_add_property(data=None) -> None:
             parking = st.number_input("Parking spaces for estimate", min_value=0, value=0, step=1, key="owner_add_parking")
             st.caption("An optional ML estimate is separate from your monthly asking rent and will not change it.")
             description = st.text_area("Description", max_chars=5000, key="owner_add_description")
+            property_photo = st.file_uploader(
+                "Property photo (optional)", type=["jpg", "jpeg", "png", "webp"],
+                help="JPEG, PNG, or WebP · maximum 8 MB. The photo is stored in the project assets folder.",
+                key="owner_add_property_photo",
+            )
             status = st.radio("Listing visibility", ["published", "draft"], horizontal=True, format_func=lambda value: "Listed" if value == "published" else "Keep as draft", key="owner_add_status")
             estimate_col, save_col = st.columns(2)
             estimate_clicked = estimate_col.form_submit_button("Estimate monthly rent", key="owner_estimate_rent", width="stretch")
@@ -77,7 +85,7 @@ def render_add_property(data=None) -> None:
         if estimate_clicked:
             st.session_state.pop("owner_rent_estimate", None)
             try:
-                validated_features = RentPredictionRequest.model_validate(prediction_features).model_dump()
+                validated_features = RentPredictionRequest.model_validate(prediction_features).model_dump(exclude_unset=True)
                 predicted_rent = predict_rent(validated_features)
                 if not math.isfinite(predicted_rent) or predicted_rent <= 0:
                     raise ValueError("The model did not produce a positive monthly estimate.")
@@ -94,22 +102,26 @@ def render_add_property(data=None) -> None:
                 st.error("Complete the title, city, and locality fields.")
                 return
             try:
-                create("listing", {
+                payload = {
                     "title": title.strip(), "city": city.strip(), "locality": locality.strip(),
                     "property_type": property_type, "rent": rent, "bedrooms": bedrooms,
-                    "occupancy_status": occupancy, "description": description.strip(), "status": status,
-                })
+                    "occupancy_status": occupancy, "security_deposit": security_deposit,
+                    "description": description.strip(), "status": status,
+                }
+                if property_photo is not None:
+                    payload["image_path"] = store_owner_image(property_photo)
+                create("listing", payload)
                 st.success("Property saved to your portfolio.")
                 st.session_state.pop("owner_rent_estimate", None)
                 st.session_state.owner_active_page = "My Properties"
                 st.rerun()
-            except ApplicationAPIError as exc:
+            except (ApplicationAPIError, ValueError) as exc:
                 st.error(str(exc))
 
         estimate = st.session_state.get("owner_rent_estimate")
         if estimate:
             try:
-                current_features = RentPredictionRequest.model_validate(prediction_features).model_dump()
+                current_features = RentPredictionRequest.model_validate(prediction_features).model_dump(exclude_unset=True)
             except ValidationError:
                 current_features = None
             if estimate["features"] != current_features:
@@ -150,15 +162,25 @@ def render_properties(_data=None) -> None:
         bedrooms = cols2[1].number_input("Bedrooms", min_value=1, max_value=30, value=min(30, max(1, int(current.get("bedrooms", 1) or 1))))
         occupancy_values = ["vacant", "occupied", "not_tracked"]
         occupancy = cols2[2].selectbox("Occupancy", occupancy_values, index=occupancy_values.index(current.get("occupancy_status", "not_tracked")) if current.get("occupancy_status", "not_tracked") in occupancy_values else 2, format_func=lambda value: {"vacant": "Vacant", "occupied": "Occupied", "not_tracked": "Not tracked"}[value])
+        security_deposit = st.number_input("Security deposit amount", min_value=0, value=max(0, int(current.get("security_deposit", 0) or 0)), step=5000)
         description = st.text_area("Description", value=current.get("description", ""), max_chars=5000)
+        property_photo = st.file_uploader(
+            "Replace property photo (optional)", type=["jpg", "jpeg", "png", "webp"],
+            help="JPEG, PNG, or WebP · maximum 8 MB.", key=f"owner_edit_property_photo_{selected['id']}",
+        )
         listing_status = st.selectbox("Listing visibility", ["published", "draft"], index=0 if current.get("status") == "published" else 1, format_func=lambda value: "Listed" if value == "published" else "Draft")
         submitted = st.form_submit_button("Save changes", type="primary")
     if submitted:
         try:
-            update(selected, {"title": title.strip(), "city": city.strip(), "locality": locality.strip(), "property_type": property_type, "rent": rent, "bedrooms": bedrooms, "occupancy_status": occupancy, "description": description.strip(), "status": listing_status})
+            payload = {"title": title.strip(), "city": city.strip(), "locality": locality.strip(), "property_type": property_type, "rent": rent, "bedrooms": bedrooms, "occupancy_status": occupancy, "security_deposit": security_deposit, "description": description.strip(), "status": listing_status}
+            if property_photo is not None:
+                payload["image_path"] = store_owner_image(property_photo)
+            elif current.get("image_path"):
+                payload["image_path"] = current["image_path"]
+            update(selected, payload)
             st.success("Property updated.")
             st.rerun()
-        except ApplicationAPIError as exc:
+        except (ApplicationAPIError, ValueError) as exc:
             st.error(str(exc))
     if st.button("Delete this property", key=f"delete_owner_property_{selected['id']}"):
         try:
@@ -254,9 +276,10 @@ def render_analytics(_data=None) -> None:
 
 def render_revenue(_data=None) -> None:
     st.title("Revenue & Rent Collection")
-    st.caption("Listing rents provide an asking-rent estimate; completed payments are not yet recorded in RentAI.")
+    st.caption("Listing rents provide asking-rent estimates. Verified booking initial payments are shown separately from recurring rent collection.")
     try:
         listings = records("listing")
+        bookings = booking_records()
     except ApplicationAPIError as exc:
         st.error(str(exc))
         return
@@ -265,14 +288,25 @@ def render_revenue(_data=None) -> None:
     potential = sum(float(item.get("rent", 0) or 0) for item in active)
     a, b, c = st.columns(3)
     a.metric("Potential monthly listed rent", money(potential))
-    b.metric("Rent collected", "Not tracked yet")
+    paid_bookings = [item for item in bookings if item.get("payment_status") == "paid"]
+    b.metric("Verified booking payments", money(sum(int(item.get("amount_due", 0)) for item in paid_bookings) / 100))
     c.metric("Outstanding rent", "Not tracked yet")
     st.subheader("Published rent schedule")
     if active:
         st.dataframe(pd.DataFrame([{"Property": item.get("title", "Property"), "City": item.get("city", ""), "Occupancy": item.get("occupancy_status", "Not tracked"), "Asking rent / month": item.get("rent", 0)} for item in active]), use_container_width=True, hide_index=True)
     else:
         st.info("Publish properties to see expected monthly asking rent.")
-    st.info("Payment receipts, due dates, collection status, income, and expenses are not stored by the current database. Collected and outstanding amounts are therefore not estimated.")
+    if paid_bookings:
+        st.subheader("Verified booking transactions")
+        st.dataframe(pd.DataFrame([{
+            "Booking ID": item.get("id"),
+            "Property": (item.get("property") or {}).get("title", "Property"),
+            "Renter": item.get("renter_name", "Renter"),
+            "Amount (INR)": int(item.get("amount_due", 0)) / 100,
+            "Transaction": (item.get("latest_payment") or {}).get("transaction_id", ""),
+            "Booking status": item.get("status", "").replace("_", " ").title(),
+        } for item in paid_bookings]), use_container_width=True, hide_index=True)
+    st.info("Only the initial booking amount is tracked. Monthly rent collection, due dates, refunds, income, and expenses are not recorded.")
 
 
 def render_maintenance(_data=None) -> None:
@@ -383,3 +417,46 @@ def render_settings(_data=None) -> None:
             st.rerun()
         except ApplicationAPIError as exc:
             st.error(str(exc))
+
+
+def render_booking_requests(_data=None) -> None:
+    st.title("Booking Requests")
+    st.caption("Review requests for your own properties. Payment status is separate from your decision.")
+    try:
+        items = booking_records()
+        notifications = booking_notifications()
+    except ApplicationAPIError as exc:
+        st.error(str(exc))
+        return
+    if notifications:
+        with st.expander("Recent booking notifications", expanded=True):
+            for notification in notifications[:5]:
+                st.info(f"{notification['message']} · {notification['created_at']}")
+    if not items:
+        st.info("No booking requests have been submitted for your listings.")
+        return
+    for item in items:
+        prop = item.get("property") or {}
+        status = item.get("status", "pending_owner_approval")
+        with st.container(border=True):
+            st.subheader(prop.get("title", "Owner listing"))
+            st.caption(" · ".join(filter(None, [prop.get("locality"), prop.get("city")])))
+            columns = st.columns(4)
+            columns[0].write(f"**Renter:** {item.get('renter_name', 'Renter')}\n\n{item.get('renter_email', '')}")
+            columns[1].write(f"**Move-in:** {item.get('move_in_date', '')}")
+            columns[2].write(f"**Monthly rent:** ₹{float(item.get('monthly_rent', 0)):,.0f}")
+            columns[3].write(f"**Initial payment:** ₹{int(item.get('amount_due', 0))/100:,.2f} INR")
+            st.write(f"**Deposit:** ₹{float(item.get('security_deposit', 0)):,.0f} · **Booking:** {status.replace('_', ' ').title()} · **Payment:** {item.get('payment_status', 'pending').replace('_', ' ').title()}")
+            st.caption(f"Booking ID: {item.get('id')} · Request date: {item.get('created_at')}")
+            if item.get("availability_conflict"):
+                st.error("Verified payment needs manual reconciliation because the listing was no longer available." if item.get("payment_status") == "paid" else "The listing is no longer marked available; payment is disabled.")
+            if status == "pending_owner_approval":
+                left, right = st.columns(2)
+                for column, decision, label in ((left, "accept", "Accept request"), (right, "reject", "Reject request")):
+                    if column.button(label, key=f"owner_booking_{decision}_{item['id']}", type="primary" if decision == "accept" else "secondary"):
+                        try:
+                            decide_booking(item["id"], decision)
+                            st.success("Request accepted. Payment remains unpaid until the renter completes verified checkout." if decision == "accept" else "Booking request rejected.")
+                            st.rerun()
+                        except ApplicationAPIError as exc:
+                            st.error(str(exc))

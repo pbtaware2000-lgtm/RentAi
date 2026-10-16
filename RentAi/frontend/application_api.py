@@ -79,6 +79,8 @@ def request(method: str, path: str, *, payload: dict | None = None, params: dict
         if exc.code == 404:
             if record_id:
                 message = "This record is no longer available. Refresh and try again."
+            elif path.startswith("/bookings") and response_detail:
+                message = response_detail
             elif path == "/application/auth/records":
                 message = "RentAI could not find the renter records endpoint."
             elif path == "/application/auth/listing-images":
@@ -87,6 +89,8 @@ def request(method: str, path: str, *, payload: dict | None = None, params: dict
                 message = "RentAI could not find the requested API endpoint."
         elif exc.code >= 500:
             message = "RentAI's application service is temporarily unavailable. Please try again later."
+        elif exc.code == 409 and response_detail:
+            message = response_detail
         elif exc.code not in {401, 403}:
             message = "RentAI could not complete that request. Please try again."
         raise ApplicationAPIError(
@@ -145,3 +149,27 @@ def admin_users() -> list[dict]:
 
 def set_user_role(uid: str, role: str) -> None:
     request("PUT", f"/application/admin/users/{uid}/role", payload={"role": role})
+
+
+def bookings() -> list[dict]:
+    return request("GET", "/bookings").get("bookings", [])
+
+
+def booking_notifications() -> list[dict]:
+    return request("GET", "/bookings/notifications").get("notifications", [])
+
+
+def booking_payment_configured() -> bool:
+    return bool(request("GET", "/bookings/payment-config").get("configured"))
+
+
+def request_booking(property_id: str, move_in_date: str) -> dict:
+    return request("POST", "/bookings", payload={"property_id": property_id, "move_in_date": move_in_date})["booking"]
+
+
+def decide_booking(booking_id: str, decision: str) -> dict:
+    return request("POST", f"/bookings/{booking_id}/decision", payload={"decision": decision})["booking"]
+
+
+def booking_checkout(booking_id: str) -> dict:
+    return request("POST", f"/bookings/{booking_id}/checkout")

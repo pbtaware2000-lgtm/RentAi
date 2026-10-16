@@ -157,6 +157,41 @@ class RenterWorkspaceTests(unittest.TestCase):
         self.assertEqual(saved["data"]["property"]["city"], "Pune")
         self.assertNotIn("admin_secret", saved["data"]["property"])
 
+    def test_saving_owner_listing_uses_canonical_published_record_and_source(self):
+        repo = MemoryRecords([{
+            "id": "listing-1", "kind": "listing", "owner_uid": "owner-a",
+            "data": {"status": "published", "title": "Owner home", "city": "Pune", "rent": 25000},
+        }])
+        renter = CurrentUser(uid="renter-a", role="renter", claims={})
+        saved = ApplicationService(repo).create_record(renter, "favorite", {
+            "property_id": "listing-1", "source": "owner_listing",
+            "property": {"title": "Untrusted title"},
+        })
+        self.assertEqual(saved["data"]["source"], "owner_listing")
+        self.assertEqual(saved["data"]["property"]["title"], "Owner home")
+
+    def test_enquiry_form_uses_owner_listing_selected_from_its_card(self):
+        from frontend.pages import renter_workspace
+
+        payload = {
+            "favorites": [], "enquiries": [], "profiles": [], "maintenance": [],
+            "listings": [{"id": "listing-1", "data": {
+                "status": "published", "title": "Sunny flat", "city": "Pune", "locality": "Aundh",
+            }}],
+            "catalog": [],
+        }
+        with patch("frontend.pages.renter_workspace._load", return_value=payload):
+            app = AppTest.from_string(
+                "import streamlit as st\n"
+                "st.session_state['rentai_uid']='renter-a'\n"
+                "st.session_state['renter_enquiry_listing_id_renter-a']='listing-1'\n"
+                "import pandas as pd\nfrom frontend.pages.renter_workspace import render_enquiries\n"
+                "render_enquiries(pd.DataFrame())",
+                default_timeout=30,
+            ).run()
+        self.assertFalse(app.exception)
+        self.assertEqual(app.selectbox(key="renter_enquiry_listing_id_renter-a").value, "listing-1")
+
     def test_renter_cannot_save_draft_owner_listing(self):
         repo = MemoryRecords([
             {"id": "draft-1", "kind": "listing", "owner_uid": "owner-a",
@@ -422,15 +457,6 @@ class RenterWorkspaceTests(unittest.TestCase):
             str(caught.exception), "RentAI could not find the renter records endpoint."
         )
 
-    def test_renter_settings_validation_only_accepts_supported_search_options(self):
-        with self.assertRaises(HTTPException):
-            ApplicationService._validate_profile_data({
-                "record_type": "renter_settings", "sort_by": "income", "sort_order": "asc",
-            })
-        self.assertEqual(ApplicationService._validate_profile_data({
-            "record_type": "renter_settings", "sort_by": "area_sqft", "sort_order": "desc",
-        }), {"record_type": "renter_settings", "sort_by": "area_sqft", "sort_order": "desc"})
-
     def test_renter_pages_render_with_empty_authorized_data(self):
         from frontend.pages import renter_workspace
 
@@ -454,7 +480,7 @@ class RenterWorkspaceTests(unittest.TestCase):
                 self.assertFalse(app.exception)
 
         with patch("frontend.pages.renter_workspace.records", return_value=[]):
-            for render_page in (renter_workspace.render_profile, renter_workspace.render_settings):
+            for render_page in (renter_workspace.render_profile,):
                 with self.subTest(page=render_page.__name__):
                     app = AppTest.from_string(
                         f"from frontend.pages.renter_workspace import {render_page.__name__}\n"
@@ -486,6 +512,120 @@ class RenterWorkspaceTests(unittest.TestCase):
                         f"{renderer.__name__}(pd.DataFrame())", default_timeout=30
                     ).run()
                     self.assertFalse(app.exception)
+
+    def test_property_origin_is_explicit_and_not_overridden_by_listing_data(self):
+        from frontend.pages.renter_support import dataset_properties, owner_listing_properties
+
+        catalog = dataset_properties(pd.DataFrame([{
+            "property_id": "same-id", "city": "Pune", "source": "owner_listing",
+        }]))
+        listings = owner_listing_properties([
+            {"id": "same-id", "kind": "listing", "data": {"status": "published", "source": "catalog"}},
+            {"id": "draft-id", "kind": "listing", "data": {"status": "draft", "source": "owner_listing"}},
+        ])
+        self.assertEqual(catalog[0]["source"], "catalog")
+        self.assertEqual([(item["id"], item["source"]) for item in listings], [
+            ("same-id", "owner_listing"),
+        ])
+
+    def test_legacy_saved_property_without_source_remains_unknown(self):
+        from frontend.pages.renter_support import favorite_for, saved_properties
+
+        record = {"id": "favorite-1", "kind": "favorite", "data": {
+            "property_id": "same-id", "property": {"city": "Pune"},
+        }}
+        saved = saved_properties([record])
+        self.assertEqual(saved[0]["source"], "unknown")
+        self.assertIs(favorite_for([record], "unknown", "same-id"), record)
+        self.assertIsNone(favorite_for([record], "catalog", "same-id"))
+
+    def test_renter_cannot_create_a_favorite_without_an_explicit_source(self):
+        renter = CurrentUser(uid="renter-a", role="renter", claims={})
+        with self.assertRaises(HTTPException) as caught:
+            ApplicationService(MemoryRecords()).create_record(renter, "favorite", {
+                "property_id": "RENT-1",
+            })
+        self.assertEqual(caught.exception.status_code, 400)
+
+    def test_dataset_enquiry_and_booking_requests_are_not_supported(self):
+        renter = CurrentUser(uid="renter-a", role="renter", claims={})
+        service = ApplicationService(MemoryRecords())
+        with self.assertRaises(HTTPException) as caught:
+            service.create_record(renter, "inquiry", {
+                "listing_id": "RENT-1", "client_name": "Renter", "message": "Is this available?",
+            })
+        self.assertEqual(caught.exception.status_code, 400)
+        with self.assertRaises(HTTPException) as caught:
+            service.create_record(renter, "booking", {"property_id": "RENT-1"})
+        self.assertEqual(caught.exception.status_code, 400)
+
+    def test_dataset_card_prefills_rent_estimate_and_never_offers_booking(self):
+        from frontend.pages.renter_support import display_property_card
+
+        app = AppTest.from_string(
+            "from frontend.pages.renter_support import display_property_card\n"
+            "display_property_card({'property_id':'RENT-1','city':'Pune','locality':'Aundh',"
+            "'property_type':'Apartment','area_sqft':900,'rent':24000}, "
+            "source='catalog', favorites=[], key_suffix='test')",
+            default_timeout=30,
+        ).run()
+        self.assertFalse(app.exception)
+        self.assertTrue(any("ML dataset property — availability not verified." in item.value for item in app.caption))
+        self.assertTrue(any(button.label == "Use for rent estimate" for button in app.button))
+        self.assertFalse(any(button.label == "Send enquiry" for button in app.button))
+        self.assertFalse(any("book" in button.label.casefold() for button in app.button))
+        self.assertTrue(any("Saving only bookmarks" in item.value for item in app.caption))
+        app.button(key="estimate_test_catalog_RENT-1").click().run()
+        self.assertEqual(app.session_state["renter_active_page"], "AI Rent Prediction")
+        self.assertEqual(app.session_state["prediction-city"], "Pune")
+        self.assertEqual(app.session_state["prediction-locality"], "Aundh")
+        self.assertEqual(app.session_state["prediction-area-sqft"], 900.0)
+
+    def test_owner_listing_card_routes_to_enquiry_and_never_offers_booking(self):
+        from frontend.pages.renter_support import display_property_card
+
+        app = AppTest.from_string(
+            "import streamlit as st\n"
+            "st.session_state['rentai_uid']='renter-a'\n"
+            "from frontend.pages.renter_support import display_property_card\n"
+            "display_property_card({'id':'listing-1','title':'Sunny flat','city':'Pune',"
+            "'status':'published'}, source='owner_listing', favorites=[], key_suffix='search')",
+            default_timeout=30,
+        ).run()
+        self.assertFalse(app.exception)
+        self.assertTrue(any("Published Owner listing" in item.value for item in app.caption))
+        self.assertTrue(any(button.label == "Send enquiry" for button in app.button))
+        self.assertFalse(any("book" in button.label.casefold() for button in app.button))
+        app.button(key="enquire_search_owner_listing_listing-1").click().run()
+        self.assertEqual(app.session_state["renter_active_page"], "My Enquiries")
+        self.assertEqual(app.session_state["renter_enquiry_listing_id_renter-a"], "listing-1")
+
+    def test_comparison_keeps_dataset_and_owner_listing_ids_in_separate_namespaces(self):
+        from frontend.pages.renter_workspace import _available_for_compare
+
+        options = _available_for_compare(pd.DataFrame(), {
+            "catalog": [{"property_id": "same-id", "city": "Pune", "rent": 20000}],
+            "listings": [{"id": "same-id", "data": {"status": "published", "city": "Pune", "rent": 25000}}],
+            "favorites": [],
+        })
+        self.assertEqual(set(options), {"catalog:same-id", "owner_listing:same-id"})
+        from frontend.pages.renter_workspace import _comparison_source_label
+        self.assertEqual(_comparison_source_label({"source": "unknown"}, set()), "Source not recorded")
+
+    def test_saved_owner_snapshot_only_allows_enquiry_when_currently_published(self):
+        from frontend.pages.renter_support import display_property_card
+
+        prop = {"id": "listing-1", "property_id": "listing-1", "title": "Sunny flat"}
+        for published_ids, expected in ((set(), False), ({"listing-1"}, True)):
+            with self.subTest(published=expected):
+                app = AppTest.from_string(
+                    "from frontend.pages.renter_support import display_property_card\n"
+                    f"display_property_card({prop!r}, source='owner_listing', favorites=[], "
+                    f"key_suffix='saved', published_owner_listing_ids={published_ids!r})",
+                    default_timeout=30,
+                ).run()
+                self.assertFalse(app.exception)
+                self.assertEqual(any(button.label == "Send enquiry" for button in app.button), expected)
 
 
 if __name__ == "__main__":

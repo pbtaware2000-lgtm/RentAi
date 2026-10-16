@@ -6,7 +6,13 @@ import math
 import pandas as pd
 import streamlit as st
 
-from frontend.application_api import ApplicationAPIError, create, delete, listing_images, records
+from frontend.application_api import ApplicationAPIError, create, delete, listing_images, records, request_booking
+from frontend.components.property_images import render_property_image
+
+CATALOG_SOURCE = "catalog"
+OWNER_LISTING_SOURCE = "owner_listing"
+UNKNOWN_SOURCE = "unknown"
+KNOWN_PROPERTY_SOURCES = {CATALOG_SOURCE, OWNER_LISTING_SOURCE}
 
 
 def renter_key(name: str) -> str:
@@ -68,9 +74,14 @@ def property_id(item: dict) -> str:
 
 
 def favorite_for(favorites: list[dict], source: str, key: str) -> dict | None:
-    return next((record for record in favorites
-                 if (record.get("data") or {}).get("source", "catalog") == source
-                 and str((record.get("data") or {}).get("property_id", "")) == str(key)), None)
+    for record in favorites:
+        data = record.get("data") or {}
+        record_source = data.get("source")
+        if not isinstance(record_source, str) or record_source not in KNOWN_PROPERTY_SOURCES:
+            record_source = UNKNOWN_SOURCE
+        if record_source == source and str(data.get("property_id", "")) == str(key):
+            return record
+    return None
 
 
 def save_property(favorites: list[dict], prop: dict, source: str) -> None:
@@ -81,6 +92,8 @@ def save_property(favorites: list[dict], prop: dict, source: str) -> None:
     if existing:
         delete(existing)
     else:
+        if source not in KNOWN_PROPERTY_SOURCES:
+            raise ValueError("This property's source is not verified, so it cannot be saved as a new listing.")
         create("favorite", {
             "property_id": key,
             "source": source,
@@ -95,11 +108,14 @@ def saved_properties(favorites: list[dict]) -> list[dict]:
         prop = data.get("property")
         if not isinstance(prop, dict):
             continue
+        source = data.get("source")
+        if not isinstance(source, str) or source not in KNOWN_PROPERTY_SOURCES:
+            source = UNKNOWN_SOURCE
         saved.append({
             "favorite_record": favorite,
-            "source": data.get("source", "catalog"),
-            "property_id": str(data.get("property_id", "")),
             **prop,
+            "source": source,
+            "property_id": str(data.get("property_id", "")),
         })
     return saved
 
@@ -117,6 +133,67 @@ def add_to_comparison(prop: dict, source: str) -> bool:
     return identity in current
 
 
+def use_for_rent_estimate(prop: dict) -> None:
+    """Open the estimator with recorded dataset features prefilled when present."""
+    st.session_state["prediction_result"] = None
+    st.session_state["prediction_error"] = None
+    state_values = {
+        "prediction-city": ("city", str),
+        "prediction-locality": ("locality", str),
+        "prediction-property_type": ("property_type", str),
+        "prediction-furnishing_status": ("furnishing_status", str),
+        "prediction-parking": ("parking", str),
+        "prediction-area-sqft": ("area_sqft", float),
+        "prediction-bedrooms": ("bedrooms", int),
+        "prediction-bathrooms": ("bathrooms", int),
+        "prediction-balcony": ("balcony", int),
+        "prediction-floor": ("floor", int),
+        "prediction-total-floors": ("total_floors", int),
+        "prediction-distance": ("distance_to_city_center_km", float),
+        "prediction-age": ("age_of_property", int),
+        "prediction-water-supply": ("water_supply", str),
+    }
+    optional_distances = (
+        "distance_to_metro_km", "distance_to_school_km",
+        "distance_to_hospital_km", "distance_to_it_park_km",
+    )
+    for key in state_values:
+        st.session_state.pop(key, None)
+    st.session_state.pop("prediction-amenities", None)
+    for name in optional_distances:
+        st.session_state.pop(f"prediction-provide-{name}", None)
+        st.session_state.pop(f"prediction-{name}", None)
+    for widget_key, (field, convert) in state_values.items():
+        value = prop.get(field)
+        if value is not None and not pd.isna(value):
+            try:
+                st.session_state[widget_key] = convert(value)
+            except (TypeError, ValueError):
+                continue
+    for name in optional_distances:
+        value = prop.get(name)
+        if value is not None and not pd.isna(value):
+            try:
+                st.session_state[f"prediction-provide-{name}"] = True
+                st.session_state[f"prediction-{name}"] = float(value)
+            except (TypeError, ValueError):
+                continue
+    amenity_fields = ("lift", "gym", "security", "power_backup", "swimming_pool", "air_conditioning", "gated_community")
+    st.session_state["prediction-amenities"] = [
+        name for name in amenity_fields
+        if str(prop.get(name, "")).strip().casefold() in {"yes", "true", "1"}
+    ]
+    st.session_state["renter_active_page"] = "AI Rent Prediction"
+
+
+def open_owner_enquiry(prop: dict) -> None:
+    listing_id = str(prop.get("id") or "")
+    if not listing_id:
+        return
+    st.session_state[renter_key("enquiry_listing_id")] = listing_id
+    st.session_state["renter_active_page"] = "My Enquiries"
+
+
 def format_money(value: object) -> str:
     try:
         amount = float(value)
@@ -127,17 +204,24 @@ def format_money(value: object) -> str:
         return "Rent not listed"
 
 
-def display_property_card(prop: dict, *, source: str, favorites: list[dict] | None, key_suffix: str) -> None:
+def display_property_card(
+    prop: dict,
+    *,
+    source: str,
+    favorites: list[dict] | None,
+    key_suffix: str,
+    published_owner_listing_ids: set[str] | None = None,
+) -> None:
     title = escape(str(prop.get("title") or f"{prop.get('property_type', 'Rental')} property"))
     locality = escape(str(prop.get("locality") or ""))
     city = escape(str(prop.get("city") or ""))
     details = " · ".join(filter(None, [locality, city]))
-    image = prop.get("image_url") or prop.get("image") or prop.get("photo_url")
-    with st.container(border=True):
-        if isinstance(image, str) and image.startswith(("https://", "http://")):
-            st.image(image, width="stretch")
-        else:
-            st.markdown("<div class='renter-property-placeholder'>⌂</div>", unsafe_allow_html=True)
+    key = str(prop.get("property_id") or prop.get("id") or "")
+    safe_key = "".join(char if char.isalnum() or char in "-_" else "-" for char in key)[:80]
+    with st.container(border=True, key=f"rentai-property-card-{source}-{key_suffix}-{safe_key}"):
+        illustrative = render_property_image(prop, source, key_suffix=key_suffix)
+        if illustrative:
+            st.caption("Illustrative image · this dataset property's photo is not verified.")
         st.markdown(f"**{title}**")
         st.caption(details or "Location not provided")
         st.markdown(f"### {format_money(prop.get('rent'))}")
@@ -147,14 +231,28 @@ def display_property_card(prop: dict, *, source: str, favorites: list[dict] | No
             if value is not None and not pd.isna(value):
                 attrs.append(f"{value} {label}")
         st.caption("  ·  ".join(attrs) if attrs else "Property details are limited")
-        if source == "owner_listing":
+        is_published_owner_listing = source == OWNER_LISTING_SOURCE and (
+            key_suffix != "saved" or key in (published_owner_listing_ids or set())
+        )
+        if source == OWNER_LISTING_SOURCE:
             if key_suffix == "saved":
-                st.caption("Saved Owner listing snapshot · publication status may have changed")
+                st.caption(
+                    "Saved Owner listing snapshot · currently published"
+                    if is_published_owner_listing
+                    else "Saved Owner listing snapshot · publication status not verified"
+                )
             else:
-                st.caption("Published Owner listing")
+                if prop.get("occupancy_status") == "vacant":
+                    st.caption("Published Owner listing · owner reports vacant; availability is checked again when you request")
+                elif prop.get("occupancy_status") == "occupied":
+                    st.caption("Published Owner listing · owner reports occupied")
+                else:
+                    st.caption("Published Owner listing · vacancy is not tracked; booking requests are disabled")
+        elif source == CATALOG_SOURCE:
+            st.caption("ML dataset property — availability not verified.")
         else:
-            st.caption("RentAI dataset property · not a live Owner listing")
-        with st.expander("Property details"):
+            st.caption("Property source not recorded · availability cannot be verified.")
+        with st.expander("View details"):
             description = prop.get("description")
             if isinstance(description, str) and description.strip():
                 st.write(description)
@@ -165,10 +263,9 @@ def display_property_card(prop: dict, *, source: str, favorites: list[dict] | No
                 value = prop.get(field)
                 if value is not None:
                     st.write(f"**{field.replace('_', ' ').title()}:** {value}")
-        key = str(prop.get("property_id") or prop.get("id") or "")
         widget_ref = f"{source}_{key}"
         existing = favorite_for(favorites or [], source, key)
-        a, b = st.columns(2)
+        a, b, c = st.columns(3)
         with a:
             if favorites is None:
                 st.button("Save unavailable", key=f"save_{key_suffix}_{widget_ref}", width="stretch", disabled=True)
@@ -182,17 +279,42 @@ def display_property_card(prop: dict, *, source: str, favorites: list[dict] | No
             if st.button("Compare", key=f"compare_{key_suffix}_{widget_ref}", width="stretch"):
                 added = add_to_comparison(prop, source)
                 st.success("Added to comparison." if added else "Comparison is limited to four properties.")
+        with c:
+            if source == CATALOG_SOURCE:
+                if st.button("Use for rent estimate", key=f"estimate_{key_suffix}_{widget_ref}", width="stretch"):
+                    use_for_rent_estimate(prop)
+                    st.rerun()
+            elif source == OWNER_LISTING_SOURCE and is_published_owner_listing:
+                if st.button("Send enquiry", key=f"enquire_{key_suffix}_{widget_ref}", width="stretch"):
+                    open_owner_enquiry(prop)
+                    st.rerun()
+        if (source == OWNER_LISTING_SOURCE and is_published_owner_listing
+                and prop.get("occupancy_status") == "vacant"):
+            with st.expander("Request booking"):
+                with st.form(f"booking_request_{widget_ref}"):
+                    move_in = st.date_input("Requested move-in date", min_value=__import__("datetime").date.today())
+                    submitted = st.form_submit_button("Send booking request", type="primary", width="stretch")
+                if submitted:
+                    try:
+                        request_booking(key, move_in.isoformat())
+                        st.success("Booking request sent. The owner must approve it before payment is available.")
+                        st.session_state["renter_active_page"] = "My Bookings"
+                        st.rerun()
+                    except ApplicationAPIError as exc:
+                        st.error(str(exc))
+        st.caption("Saving only bookmarks this property; it does not reserve or book it.")
 
 
 def dataset_properties(data: pd.DataFrame) -> list[dict]:
     if data.empty:
         return []
-    return data.where(pd.notna(data), None).to_dict(orient="records")
+    return [{**prop, "source": CATALOG_SOURCE}
+            for prop in data.where(pd.notna(data), None).to_dict(orient="records")]
 
 
 def owner_listing_properties(listings: list[dict]) -> list[dict]:
     return [
-        {"id": record.get("id"), "source": "owner_listing", **(record.get("data") or {})}
+        {**(record.get("data") or {}), "id": record.get("id"), "source": OWNER_LISTING_SOURCE}
         for record in listings
         if (record.get("data") or {}).get("status") == "published"
     ]
