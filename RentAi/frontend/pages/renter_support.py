@@ -16,13 +16,16 @@ def renter_key(name: str) -> str:
 
 def load_renter_records() -> dict[str, list[dict]]:
     listings = records("listing")
-    image_by_listing = {}
+    images_by_listing = {}
     for image in listing_images():
-        image_by_listing.setdefault(image.get("record_id"), image.get("url"))
+        if image.get("record_id") and image.get("url", "").startswith(("https://", "http://")):
+            images_by_listing.setdefault(image["record_id"], []).append(image["url"])
     for listing in listings:
         detail = listing.get("data") or {}
-        if image_by_listing.get(listing.get("id")):
-            detail["image_url"] = image_by_listing[listing["id"]]
+        urls = images_by_listing.get(listing.get("id"), [])
+        if urls:
+            detail["image_urls"] = urls
+            detail["image_url"] = urls[0]
             listing["data"] = detail
     return {
         "favorites": records("favorite"),
@@ -44,13 +47,15 @@ def load_search_records() -> tuple[dict[str, list[dict] | None], list[Applicatio
         return result, [exc]
 
     try:
-        image_by_listing = {}
+        images_by_listing = {}
         for image in listing_images():
-            image_by_listing.setdefault(image.get("record_id"), image.get("url"))
+            if image.get("record_id") and image.get("url", "").startswith(("https://", "http://")):
+                images_by_listing.setdefault(image["record_id"], []).append(image["url"])
         for listing in result["listings"]:
             detail = listing.get("data") or {}
-            if image_by_listing.get(listing.get("id")):
-                listing["data"] = {**detail, "image_url": image_by_listing[listing["id"]]}
+            urls = images_by_listing.get(listing.get("id"), [])
+            if urls:
+                listing["data"] = {**detail, "image_urls": urls, "image_url": urls[0]}
     except ApplicationAPIError as exc:
         errors.append(exc)
 
@@ -155,6 +160,15 @@ def display_property_card(prop: dict, *, source: str, favorites: list[dict] | No
         else:
             st.caption("RentAI dataset property · not a live Owner listing")
         with st.expander("Property details"):
+            gallery = prop.get("image_urls")
+            if isinstance(gallery, list):
+                gallery_urls = [url for url in gallery if isinstance(url, str) and url.startswith(("https://", "http://"))]
+                if gallery_urls:
+                    st.markdown("**Property photos**")
+                    gallery_columns = st.columns(min(4, len(gallery_urls)))
+                    for index, url in enumerate(gallery_urls):
+                        with gallery_columns[index % len(gallery_columns)]:
+                            st.image(url, caption=f"Photo {index + 1}", width="stretch")
             description = prop.get("description")
             if isinstance(description, str) and description.strip():
                 st.write(description)
@@ -168,7 +182,7 @@ def display_property_card(prop: dict, *, source: str, favorites: list[dict] | No
         key = str(prop.get("property_id") or prop.get("id") or "")
         widget_ref = f"{source}_{key}"
         existing = favorite_for(favorites or [], source, key)
-        a, b = st.columns(2)
+        a, b, c = st.columns(3)
         with a:
             if favorites is None:
                 st.button("Save unavailable", key=f"save_{key_suffix}_{widget_ref}", width="stretch", disabled=True)
@@ -182,6 +196,11 @@ def display_property_card(prop: dict, *, source: str, favorites: list[dict] | No
             if st.button("Compare", key=f"compare_{key_suffix}_{widget_ref}", width="stretch"):
                 added = add_to_comparison(prop, source)
                 st.success("Added to comparison." if added else "Comparison is limited to four properties.")
+        if source == "owner_listing" and key_suffix == "search":
+            with c:
+                if st.button("Send enquiry", key=f"enquire_{key_suffix}_{widget_ref}", width="stretch"):
+                    st.session_state[renter_key("enquiry_listing")] = key
+                    st.rerun()
 
 
 def dataset_properties(data: pd.DataFrame) -> list[dict]:

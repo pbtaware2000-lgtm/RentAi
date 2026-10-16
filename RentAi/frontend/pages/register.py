@@ -3,7 +3,7 @@
 import streamlit as st
 
 from frontend.authentication import (
-    AuthenticationError, fetch_verified_user, firebase_password_sign_up,
+    AuthenticationError, fetch_verified_user, password_sign_up,
     normalize_email, provision_public_role, save_session,
 )
 from frontend.pages.role_landing import PUBLIC_ROLES
@@ -43,14 +43,13 @@ def render(selected_role: str | None = None) -> None:
     except AuthenticationError as exc:
         st.error(str(exc))
         return
-    if len(password) < 6:
-        st.error("Choose a password with at least 6 characters.")
+    if len(password) < 8:
+        st.error("Choose a password with at least 8 characters.")
         return
     try:
         with st.spinner("Creating your account…"):
-            tokens = firebase_password_sign_up(email, password, name)
-            provision_public_role(tokens["id_token"], role)
-            user = fetch_verified_user(tokens["id_token"])
+            tokens = password_sign_up(email, password, name, role)
+            user = tokens["user"]
             if user["role"] != role:
                 st.error("RentAI could not verify the selected account type. Contact an administrator.")
                 return

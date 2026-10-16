@@ -1,6 +1,7 @@
 """Renter workspace navigation, filtering, and user scoping tests."""
 
 import unittest
+from contextlib import nullcontext
 from io import BytesIO
 from unittest.mock import patch
 from urllib.error import HTTPError
@@ -14,6 +15,7 @@ from backend.auth.dependencies import CurrentUser
 from backend.services.application_service import ApplicationService
 from frontend.application_api import ApplicationAPIError, request
 from frontend.pages.renter_workspace import filter_properties
+from frontend.pages import renter_support
 
 
 class MemoryRecords:
@@ -43,6 +45,40 @@ class MemoryRecords:
 
 
 class RenterWorkspaceTests(unittest.TestCase):
+    def test_renter_listing_and_details_receive_all_persisted_photo_urls(self):
+        listings = [{"id": "listing-a", "kind": "listing", "data": {"title": "Home"}}]
+        images = [
+            {"record_id": "listing-a", "url": "https://images.test/new.jpg"},
+            {"record_id": "listing-a", "url": "https://images.test/old.jpg"},
+            {"record_id": "other-listing", "url": "https://images.test/private.jpg"},
+            {"record_id": "listing-a", "url": "javascript:alert(1)"},
+        ]
+        with patch.object(renter_support, "records", side_effect=lambda kind: listings if kind == "listing" else []), \
+             patch.object(renter_support, "listing_images", return_value=images):
+            result, errors = renter_support.load_search_records()
+        self.assertEqual(errors, [])
+        self.assertEqual(result["listings"][0]["data"]["image_url"], "https://images.test/new.jpg")
+        self.assertEqual(result["listings"][0]["data"]["image_urls"], [
+            "https://images.test/new.jpg", "https://images.test/old.jpg",
+        ])
+
+        with patch.object(renter_support.st, "image") as render_image, patch.object(
+            renter_support.st, "expander", side_effect=lambda *_args, **_kwargs: nullcontext()
+        ):
+            app = AppTest.from_string(
+                "from frontend.pages.renter_support import display_property_card\n"
+                "display_property_card({'id': 'listing-a', 'title': 'Home', 'image_url': 'https://images.test/new.jpg', "
+                "'image_urls': ['https://images.test/new.jpg', 'https://images.test/old.jpg']}, "
+                "source='owner_listing', favorites=[], key_suffix='search')"
+            ).run()
+        self.assertFalse(app.exception)
+        rendered_urls = [call.args[0] for call in render_image.call_args_list]
+        self.assertEqual(rendered_urls, [
+            "https://images.test/new.jpg",
+            "https://images.test/new.jpg",
+            "https://images.test/old.jpg",
+        ])
+
     def test_search_filters_keep_sources_distinct_and_sort_by_real_values(self):
         items = [
             ({"property_id": "catalog-1", "city": "Pune", "locality": "Aundh", "rent": 30000, "bedrooms": 2}, "catalog"),
@@ -281,6 +317,77 @@ class RenterWorkspaceTests(unittest.TestCase):
             for item in app.markdown
         ))
 
+    def test_search_published_listing_card_opens_enquiry_form_and_submits(self):
+        listing = {
+            "id": "listing-enquiry-test", "kind": "listing", "owner_uid": "owner-1",
+            "data": {
+                "title": "Enquiry Home", "city": "Pune", "locality": "Aundh",
+                "property_type": "Apartment", "rent": 28000, "bedrooms": 2,
+                "status": "published", "description": "Live Owner listing",
+            },
+        }
+        records_by_kind = {"listing": [listing], "favorite": [], "profile": []}
+        with patch(
+            "frontend.pages.renter_support.records", side_effect=lambda kind: records_by_kind[kind]
+        ), patch("frontend.pages.renter_support.listing_images", return_value=[]), patch(
+            "frontend.pages.renter_workspace.create", return_value={"id": "enquiry-1"}
+        ) as create_enquiry:
+            app = AppTest.from_string(
+                "import pandas as pd\nfrom frontend.pages.renter_workspace import render_search\n"
+                "render_search(pd.DataFrame(columns=['property_id','city','rent']))",
+                default_timeout=30,
+            ).run()
+            self.assertFalse(app.exception)
+            self.assertTrue(any(button.label == "Send enquiry" for button in app.button))
+            app.button(key="enquire_search_owner_listing_listing-enquiry-test").click().run()
+            self.assertIn("Enquiry Home", "\n".join(item.value for item in app.caption))
+            next(item for item in app.text_input if item.label == "Your name *").set_value("Renter One")
+            next(item for item in app.text_area if item.label == "Optional message to the Owner").set_value("Could I view this property?")
+            next(button for button in app.button if button.label == "Submit enquiry").click().run()
+
+        self.assertFalse(app.exception)
+        create_enquiry.assert_called_once_with("inquiry", {
+            "listing_id": "listing-enquiry-test", "client_name": "Renter One",
+            "client_phone": "", "message": "Could I view this property?",
+        })
+
+    def test_owner_enquiry_inbox_shows_details_and_updates_status(self):
+        enquiry = {
+            "id": "inquiry-owner-view", "kind": "inquiry", "owner_uid": "renter-1",
+            "data": {
+                "listing_id": "listing-owner-view", "client_uid": "renter-1",
+                "client_name": "Renter One", "client_email": "renter@example.test",
+                "client_phone": "555-0100", "message": "May I schedule a viewing?",
+                "status": "pending", "created_at": "2026-10-16T10:00:00+00:00",
+                "property_owner_uid": "owner-1",
+                "property": {"title": "Owner Home", "city": "Pune", "locality": "Aundh"},
+            },
+        }
+        listing = {
+            "id": "listing-owner-view", "kind": "listing", "owner_uid": "owner-1",
+            "data": {"title": "Owner Home", "city": "Pune", "locality": "Aundh", "status": "published"},
+        }
+        with patch(
+            "frontend.pages.owner_sections.records",
+            side_effect=lambda kind: [enquiry] if kind == "inquiry" else [listing],
+        ), patch("frontend.pages.owner_sections.update", return_value={**enquiry, "data": {**enquiry["data"], "status": "accepted"}}) as save_status:
+            app = AppTest.from_string(
+                "from frontend.pages.owner_sections import render_enquiries\nrender_enquiries()",
+                default_timeout=30,
+            ).run()
+            self.assertFalse(app.exception)
+            rendered = "\n".join(item.value for item in [*app.markdown, *app.caption])
+            self.assertIn("Owner Home", rendered)
+            self.assertIn("Renter One", rendered)
+            self.assertIn("renter@example.test", rendered)
+            self.assertIn("May I schedule a viewing?", rendered)
+            app.selectbox(key="owner_enquiry_status_value_inquiry-owner-view").set_value("accepted")
+            next(button for button in app.button if button.label == "Save status").click().run()
+
+        self.assertFalse(app.exception)
+        save_status.assert_called_once()
+        self.assertEqual(save_status.call_args.args[1]["status"], "accepted")
+
     def test_live_listing_filters_apply_to_real_owner_listing_fields(self):
         from frontend.pages import renter_workspace
 
@@ -378,6 +485,7 @@ class RenterWorkspaceTests(unittest.TestCase):
         cases = (
             (401, "Your session has expired. Sign in again."),
             (403, "Your account is not allowed to perform that action."),
+            (409, "You already have an active enquiry for this property."),
             (404, "This record is no longer available. Refresh and try again."),
             (503, "RentAI's application service is temporarily unavailable. Please try again later."),
         )
@@ -389,7 +497,10 @@ class RenterWorkspaceTests(unittest.TestCase):
                 side_effect=HTTPError(
                     "http://127.0.0.1:8001/application/records/favorite-123",
                     status, "failure", None,
-                    BytesIO(b'{"detail":"Record not found"}' if status == 404 else b"{}"),
+                    BytesIO(
+                        b'{"detail":"Record not found"}' if status == 404 else
+                        b'{"detail":"You already have an active enquiry for this property."}' if status == 409 else b"{}"
+                    ),
                 ),
             ):
                 with self.assertRaises(ApplicationAPIError) as caught:

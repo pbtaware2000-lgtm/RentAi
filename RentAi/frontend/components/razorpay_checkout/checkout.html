@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>RentAI Secure Rent Checkout</title>
+  <style>
+    :root { color-scheme: light; font-family: Arial, sans-serif; color: #172033; background: #f4f6f9; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; }
+    main { box-sizing: border-box; width: min(520px, calc(100vw - 32px)); padding: 28px;
+      border: 1px solid #e1e6ee; border-radius: 14px; background: white; box-shadow: 0 12px 36px #17203318; }
+    h1 { margin: 0 0 8px; color: #101d3a; font-size: 22px; }
+    p { margin: 8px 0; line-height: 1.5; }
+    #amount { color: #101d3a; font-size: 28px; font-weight: 700; }
+    #status { min-height: 24px; margin-top: 18px; color: #526071; }
+    .secure { color: #667386; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>RentAI Secure Checkout</h1>
+    <p id="description">Connecting securely to RentAI...</p>
+    <p id="amount"></p>
+    <p id="status" role="status" aria-live="polite">Waiting for order details.</p>
+    <p class="secure">Razorpay Test Mode. RentAI records rent as Paid only after server verification.</p>
+  </main>
+  <script>
+    (() => {
+      const status = document.getElementById("status");
+      const description = document.getElementById("description");
+      const amount = document.getElementById("amount");
+      const channel = window.location.hash.slice(1);
+      const origin = window.location.origin;
+      const log = (stage, details = {}) => console.info("[RentAI Razorpay tab]", { stage, ...details });
+      let initialized = false;
+      let resultSent = false;
+      let order = null;
+      let loadTimer = null;
+      const notifyOpener = (type, payload = {}) => {
+        if (!window.opener || window.opener.closed || !channel) return false;
+        window.opener.postMessage({ type, channel, ...payload }, origin);
+        return true;
+      };
+      const sendStatus = (code, message) => {
+        status.textContent = message;
+        notifyOpener("rentai_checkout_status", { status: code, message });
+        log("checkout_tab_status", { status: code });
+      };
+      const sendResult = (result) => {
+        if (resultSent) return;
+        resultSent = true;
+        notifyOpener("rentai_checkout_result", { result });
+        status.textContent = result.status === "checkout_success"
+          ? "Payment response sent to RentAI. Return to the RentAI tab for verification."
+          : result.status === "checkout_cancelled"
+            ? "Checkout cancelled. Return to RentAI; the rent remains Pending."
+            : (typeof result.message === "string" && result.message.trim()
+              ? result.message.slice(0, 180)
+              : "Checkout failed. Return to RentAI to retry; the rent remains Pending.");
+        log("checkout_result_sent", { status: result.status });
+      };
+      const validOrder = (data) => Boolean(data && typeof data === "object" &&
+        typeof data.key_id === "string" && data.key_id.startsWith("rzp_test_") &&
+        typeof data.order_id === "string" && /^order_[A-Za-z0-9]+$/.test(data.order_id) &&
+        Number.isSafeInteger(data.amount) && data.amount > 0 && data.currency === "INR" &&
+        typeof data.name === "string" && typeof data.description === "string");
+      const fail = (code, message) => {
+        log("checkout_initialization_failed", { reason: code });
+        sendStatus(code, message);
+        sendResult({ status: "checkout_failed", message });
+      };
+      const startCheckout = () => {
+        if (!order || resultSent) return;
+        if (typeof window.Razorpay !== "function") {
+          const script = document.createElement("script");
+          let settled = false;
+          loadTimer = window.setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            script.remove();
+            fail("script_timeout", "Razorpay Checkout did not load. Check your connection or content blocker and retry from RentAI.");
+          }, 15000);
+          const finishLoad = (error) => {
+            if (settled) return;
+            settled = true;
+            window.clearTimeout(loadTimer);
+            loadTimer = null;
+            if (error) {
+              script.remove();
+              fail("script_error", "Razorpay Checkout could not load. Check your connection or content blocker and retry from RentAI.");
+            } else if (typeof window.Razorpay !== "function") {
+              fail("constructor_missing", "Razorpay Checkout did not initialize. Return to RentAI and retry.");
+            } else {
+              launchCheckout();
+            }
+          };
+          status.textContent = "Loading Razorpay Test Mode...";
+          script.src = "https://checkout.razorpay.com/v1/checkout.js";
+          script.onload = () => finishLoad();
+          script.onerror = () => finishLoad(new Error("load failed"));
+          document.head.appendChild(script);
+          return;
+        }
+        launchCheckout();
+      };
+      const launchCheckout = () => {
+        if (!order || resultSent) return;
+        log("checkout_constructor_started");
+        try {
+          const checkout = new window.Razorpay({
+            key: order.key_id,
+            order_id: order.order_id,
+            amount: order.amount,
+            currency: order.currency,
+            name: order.name,
+            description: order.description,
+            theme: { color: "#f36b21" },
+            handler: (response) => sendResult({
+              status: "checkout_success",
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_signature: response.razorpay_signature,
+            }),
+            modal: { ondismiss: () => sendResult({ status: "checkout_cancelled" }) },
+          });
+          checkout.on("payment.failed", (response) => {
+            const message = response && response.error && response.error.description
+              ? String(response.error.description).slice(0, 180)
+              : "Razorpay could not complete the payment.";
+            sendResult({ status: "checkout_failed", message });
+          });
+          sendStatus("checkout_opening", "Opening Razorpay Checkout...");
+          log("checkout_open_called");
+          checkout.open();
+        } catch (error) {
+          fail("constructor_or_open_error", "Razorpay Checkout could not open. Return to RentAI and retry.");
+        }
+      };
+      window.addEventListener("message", (event) => {
+        if (event.source !== window.opener || event.origin !== origin || !event.data ||
+            event.data.type !== "rentai_checkout_init" || event.data.channel !== channel || initialized) return;
+        initialized = true;
+        const suppliedOrder = event.data.checkout;
+        if (!validOrder(suppliedOrder)) {
+          fail("invalid_order_details", "RentAI returned invalid Test Mode order details. Return to RentAI and retry.");
+          return;
+        }
+        order = suppliedOrder;
+        description.textContent = order.description;
+        amount.textContent = new Intl.NumberFormat("en-IN", {
+          style: "currency", currency: order.currency, maximumFractionDigits: 2,
+        }).format(order.amount / 100);
+        log("order_details_received", { key_id_present: true, order_id_present: true, amount_present: true });
+        notifyOpener("rentai_checkout_status", { status: "checkout_tab_initialized", message: "Checkout opened in a new tab." });
+        startCheckout();
+      });
+      window.addEventListener("message", (event) => {
+        if (event.source !== window.opener || event.origin !== origin || !event.data ||
+            event.data.type !== "rentai_checkout_ack" || event.data.channel !== channel) return;
+        log("checkout_result_acknowledged");
+        window.close();
+      });
+      if (window.history && window.history.replaceState) {
+        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      }
+      if (!channel || !notifyOpener("rentai_checkout_ready")) {
+        status.textContent = "This checkout tab could not connect to RentAI. Close it and retry.";
+      } else {
+        log("checkout_tab_ready_sent");
+      }
+    })();
+  </script>
+</body>
+</html>

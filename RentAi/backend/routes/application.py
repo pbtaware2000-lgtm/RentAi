@@ -1,4 +1,4 @@
-"""Authenticated routes for Firebase-backed application records."""
+"""Authenticated routes for SQLite-backed application records."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 import logging
@@ -7,9 +7,7 @@ logger = logging.getLogger(__name__)
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from backend.auth.dependencies import CurrentUser, get_current_user, require_roles
-from backend.core.firebase import (
-    FirebaseConfigurationError,
-)
+from backend.core.auth import sign_in, register_account as create_sqlite_account
 from backend.schemas.application_schemas import (
     ApplicationRecordCreate,
     ApplicationRecordResponse,
@@ -17,12 +15,15 @@ from backend.schemas.application_schemas import (
     BrokerAssignmentRequest,
     RoleGrantRequest,
     PublicRegistrationRequest,
+    RazorpayPaymentVerificationRequest,
 )
 from backend.services.application_service import ApplicationService
+from backend.services.razorpay_service import RazorpayRentService
 
 router = APIRouter(prefix="/application/records", tags=["application"])
 auth_router = APIRouter(prefix="/application/auth", tags=["application-auth"])
 admin_router = APIRouter(prefix="/application/admin", tags=["application-admin"])
+payments_router = APIRouter(prefix="/application/payments/razorpay", tags=["rent-payments"])
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
@@ -49,16 +50,35 @@ def register_account(
         raise HTTPException(status_code=409, detail="An account role is already assigned") from exc
     except ValueError as exc:
         raise HTTPException(status_code=401, detail="Invalid or revoked token") from exc
-    except FirebaseConfigurationError as exc:
-        raise HTTPException(status_code=503, detail="Authentication service unavailable") from exc
     except Exception:
         logger.exception("Public account role provisioning failed")
         raise HTTPException(status_code=503, detail="Account registration service unavailable") from None
 
 
+@auth_router.post("/sign-in")
+def sign_in_account(payload: dict):
+    try:
+        uid, token = sign_in(str(payload.get("email", "")).strip().lower(), str(payload.get("password", "")))
+        from backend.repositories.sqlite_repository import SQLiteRepository
+        user = SQLiteRepository().account_by_uid(uid)
+        return {"id_token": token, "refresh_token": token, "expires_in": 30 * 24 * 3600, "user": user}
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+
+
+@auth_router.post("/sign-up", status_code=201)
+def sign_up_account(payload: dict):
+    try:
+        uid, token = create_sqlite_account(str(payload.get("email", "")).strip().lower(), str(payload.get("password", "")), str(payload.get("name", "")), str(payload.get("role", "")))
+        from backend.repositories.sqlite_repository import SQLiteRepository
+        return {"id_token": token, "refresh_token": token, "expires_in": 30 * 24 * 3600, "user": SQLiteRepository().account_by_uid(uid)}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @auth_router.get("/records")
 def list_account_records(
-    kind: str | None = Query(default=None, pattern="^(listing|profile|favorite|inquiry|maintenance)$"),
+    kind: str | None = Query(default=None, pattern="^(listing|profile|favorite|inquiry|maintenance|tenancy|rent_payment)$"),
     user: CurrentUser = Depends(get_current_user),
 ):
     try:
@@ -67,10 +87,42 @@ def list_account_records(
         raise HTTPException(status_code=503, detail="Application storage unavailable") from exc
 
 
+@payments_router.post("/rent/{rent_record_id}/order")
+def create_rent_order(rent_record_id: str, user: CurrentUser = Depends(get_current_user)):
+    try:
+        return RazorpayRentService().create_order(user, rent_record_id)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail="Razorpay rent payments are temporarily unavailable") from exc
+
+
+@payments_router.post("/verify")
+def verify_rent_payment(
+    payload: RazorpayPaymentVerificationRequest,
+    user: CurrentUser = Depends(get_current_user),
+):
+    try:
+        return RazorpayRentService().verify_payment(
+            user,
+            payment_id=payload.razorpay_payment_id,
+            order_id=payload.razorpay_order_id,
+            signature=payload.razorpay_signature,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail="Razorpay rent verification is temporarily unavailable") from exc
+
+
 @auth_router.get("/listing-images")
 def list_visible_listing_images(user: CurrentUser = Depends(get_current_user)):
     try:
         return {"images": ApplicationService().list_listing_images_for_user(user)}
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail="Application storage unavailable") from exc
+
+
+@auth_router.get("/profile-images")
+def list_visible_profile_images(user: CurrentUser = Depends(get_current_user)):
+    try:
+        return {"images": ApplicationService().list_profile_images_for_user(user)}
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail="Application storage unavailable") from exc
 
@@ -148,50 +200,3 @@ def provision_user_role(
         raise HTTPException(status_code=403, detail="Trusted Admin authorization is required") from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail="Role provisioning request is invalid") from exc
-    except FirebaseConfigurationError as exc:
-        raise HTTPException(status_code=503, detail="Authentication service unavailable") from exc
-
-
-
-@admin_router.post("/bootstrap", status_code=204)
-def bootstrap_admin(
-    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
-):
-    """Provision only a UID explicitly configured by the deployment operator."""
-    if credentials is None or not credentials.credentials:
-        raise HTTPException(
-            status_code=401,
-            detail="Bearer token required",
-        )
-
-    try:
-        ApplicationService().bootstrap_first_admin(
-            credentials.credentials
-        )
-
-    except PermissionError as exc:
-        raise HTTPException(
-            status_code=403,
-            detail=str(exc),
-        ) from exc
-
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid or revoked token",
-        ) from exc
-
-    except FirebaseConfigurationError as exc:
-        logger.exception("Firebase configuration error during Admin bootstrap")
-        raise HTTPException(
-            status_code=503,
-            detail="Authentication service unavailable",
-        ) from exc
-
-    except Exception:
-        logger.exception("Unexpected error during Admin bootstrap")
-        raise HTTPException(
-            status_code=503,
-            detail="Authentication service unavailable",
-        ) from None
-

@@ -2,6 +2,8 @@
 
 import io
 import asyncio
+import builtins
+import os
 import sys
 import types
 import unittest
@@ -12,7 +14,8 @@ from fastapi.datastructures import UploadFile
 from starlette.datastructures import Headers
 from PIL import Image
 
-from backend.services.image_service import ImageService
+from backend.services.image_service import ImageConfigurationError, ImageService, _load_cloudinary_sdk
+from backend.core.config import get_cloudinary_credentials
 from backend.routes.images import upload_image
 
 
@@ -85,7 +88,7 @@ class ImageServiceTests(unittest.TestCase):
             headers=Headers({"content-type": "image/jpeg"}),
         )
         owner = type("User", (), {"uid": "owner-1", "role": "owner"})()
-        with patch("backend.services.image_service.FirestoreRepository", return_value=Repository()):
+        with patch("backend.routes.images.ImageService", return_value=ImageService(Repository())):
             with self.assertRaises(HTTPException) as caught:
                 asyncio.run(upload_image("listing-1", file, owner))
         self.assertEqual(caught.exception.status_code, 400)
@@ -96,6 +99,87 @@ class ImageServiceTests(unittest.TestCase):
             ImageService._validate_image(png_bytes((8001, 1)))
         with self.assertRaisesRegex(ValueError, "10 MiB"):
             ImageService._validate_image(b"x" * (10 * 1024 * 1024 + 1))
+
+    def test_missing_cloudinary_configuration_names_are_reported_without_values(self):
+        owner = type("User", (), {"uid": "owner-1", "role": "owner"})()
+        with patch("backend.services.image_service.get_cloudinary_credentials", return_value=(None, None, None, [
+            "CLOUDINARY_CLOUD_NAME", "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET",
+        ])):
+            with self.assertRaises(ImageConfigurationError) as caught:
+                ImageService(Repository()).upload(owner, "listing-1", png_bytes(), "image.png")
+        message = str(caught.exception)
+        self.assertIn("CLOUDINARY_CLOUD_NAME", message)
+        self.assertIn("CLOUDINARY_API_KEY", message)
+        self.assertIn("CLOUDINARY_API_SECRET", message)
+        self.assertNotIn("test-secret", message)
+
+    def test_cloudinary_credentials_are_read_from_backend_dotenv_without_shared_env_export(self):
+        config_values = {
+            "CLOUDINARY_CLOUD_NAME": "cloud-test",
+            "CLOUDINARY_API_KEY": "key-test",
+            "CLOUDINARY_API_SECRET": "secret-test",
+        }
+        with patch.dict("os.environ", {}, clear=True), patch(
+            "backend.core.config.dotenv_values", return_value=config_values
+        ):
+            values = get_cloudinary_credentials()
+        self.assertEqual(values, ("cloud-test", "key-test", "secret-test", []))
+        self.assertNotIn("CLOUDINARY_API_SECRET", os.environ)
+
+    def test_route_returns_safe_missing_configuration_error(self):
+        file = UploadFile(filename="photo.png", file=io.BytesIO(png_bytes()), headers=Headers({"content-type": "image/png"}))
+        owner = type("User", (), {"uid": "owner-1", "role": "owner"})()
+        with patch("backend.services.image_service.get_cloudinary_credentials", return_value=(None, None, None, [
+            "CLOUDINARY_CLOUD_NAME", "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET",
+        ])), \
+             patch("backend.routes.images.ImageService", return_value=ImageService(Repository())):
+            with self.assertRaises(HTTPException) as caught:
+                asyncio.run(upload_image("listing-1", file, owner))
+        self.assertEqual(caught.exception.status_code, 503)
+        self.assertIn("CLOUDINARY_API_SECRET", caught.exception.detail)
+
+    def test_missing_sdk_has_actionable_backend_response(self):
+        file = UploadFile(filename="photo.png", file=io.BytesIO(png_bytes()), headers=Headers({"content-type": "image/png"}))
+        owner = type("User", (), {"uid": "owner-1", "role": "owner"})()
+        with patch("backend.services.image_service.get_cloudinary_credentials", return_value=("cloud", "key", "secret", [])), \
+             patch.dict(sys.modules, {"cloudinary": None, "cloudinary.uploader": None}), \
+             patch("backend.routes.images.ImageService", return_value=ImageService(Repository())):
+            with self.assertRaises(HTTPException) as caught:
+                asyncio.run(upload_image("listing-1", file, owner))
+        self.assertEqual(caught.exception.status_code, 503)
+        self.assertIn("Cloudinary package is missing", caught.exception.detail)
+
+    def test_internal_cloudinary_import_dependency_is_not_mislabeled_as_missing_sdk(self):
+        package = types.ModuleType("cloudinary")
+        original_import = builtins.__import__
+
+        def dependency_failure(name, *args, **kwargs):
+            if name == "cloudinary.uploader":
+                raise ModuleNotFoundError("No module named 'internal_crypto'", name="internal_crypto")
+            return original_import(name, *args, **kwargs)
+
+        with patch.dict(sys.modules, {"cloudinary": package}), patch(
+            "builtins.__import__", side_effect=dependency_failure
+        ):
+            with self.assertRaises(ImageConfigurationError) as caught:
+                _load_cloudinary_sdk()
+        self.assertIn("internal_crypto", str(caught.exception))
+        self.assertNotIn("package is missing", str(caught.exception))
+
+    def test_cloudinary_credential_rejection_names_settings_without_values(self):
+        class RejectedUploader(FakeUploader):
+            def upload(self, *_args, **_kwargs):
+                error = RuntimeError("provider response intentionally not included")
+                error.http_code = 401
+                raise error
+
+        uploader = RejectedUploader()
+        package, upload_module = cloudinary_modules(uploader)
+        owner = type("User", (), {"uid": "owner-1", "role": "owner"})()
+        with patch("backend.services.image_service.get_cloudinary_credentials", return_value=("cloud", "key", "secret", [])), \
+             patch.dict(sys.modules, {"cloudinary": package, "cloudinary.uploader": upload_module}):
+            with self.assertRaisesRegex(ImageConfigurationError, "Verify CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET"):
+                ImageService(Repository()).upload(owner, "listing-1", png_bytes(), "image.png")
 
     @patch.dict(
         "os.environ",
@@ -116,7 +200,7 @@ class ImageServiceTests(unittest.TestCase):
         "os.environ",
         {"CLOUDINARY_CLOUD_NAME": "test", "CLOUDINARY_API_KEY": "key", "CLOUDINARY_API_SECRET": "secret"},
     )
-    def test_firestore_failure_triggers_cloudinary_cleanup(self):
+    def test_metadata_persistence_failure_triggers_cloudinary_cleanup(self):
         uploader = FakeUploader()
         package, upload_module = cloudinary_modules(uploader)
         owner = type("User", (), {"uid": "owner-1", "role": "owner"})()

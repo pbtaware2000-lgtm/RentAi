@@ -1,1 +1,1 @@
-"""Domain objects for Firebase-backed application features."""
+"""Domain objects for application features."""
