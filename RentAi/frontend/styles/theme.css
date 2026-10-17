@@ -45,6 +45,17 @@ html, body {
 	color: var(--rentai-muted) !important;
 }
 
+[data-testid="stMainBlockContainer"] [data-testid="stExpander"] {
+	background: var(--rentai-card);
+	border: 1px solid var(--rentai-border);
+	border-radius: 10px;
+}
+
+[data-testid="stMainBlockContainer"] [data-testid="stExpander"] summary,
+[data-testid="stMainBlockContainer"] [data-testid="stExpander"] summary p {
+	color: var(--rentai-ink) !important;
+}
+
 [data-testid="stMainBlockContainer"] h1,
 [data-testid="stMainBlockContainer"] h2,
 [data-testid="stMainBlockContainer"] h3 {

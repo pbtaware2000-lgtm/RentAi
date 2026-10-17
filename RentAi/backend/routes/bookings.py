@@ -4,7 +4,9 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from backend.auth.dependencies import CurrentUser, get_current_user, require_roles
-from backend.services.booking_service import BookingService, razorpay_configured
+from backend.core.config import razorpay_configuration_status
+from backend.schemas.application_schemas import RazorpayPaymentVerificationRequest
+from backend.services.booking_service import BookingService
 
 router = APIRouter(prefix="/bookings", tags=["bookings"])
 
@@ -20,7 +22,7 @@ class BookingDecision(BaseModel):
 
 @router.get("/payment-config")
 def payment_configuration(user: CurrentUser = Depends(require_roles("renter"))):
-    return {"configured": razorpay_configured()}
+    return razorpay_configuration_status()
 
 
 @router.get("")
@@ -51,6 +53,15 @@ def decide_booking(booking_id: str, payload: BookingDecision, user: CurrentUser 
 @router.post("/{booking_id}/checkout")
 def create_checkout(booking_id: str, user: CurrentUser = Depends(require_roles("renter"))):
     return BookingService().create_checkout(user, booking_id)
+
+
+@router.post("/{booking_id}/verify")
+def verify_checkout(booking_id: str, payload: RazorpayPaymentVerificationRequest,
+                    user: CurrentUser = Depends(require_roles("renter"))):
+    return BookingService().verify_payment(
+        user, booking_id, payload.razorpay_payment_id,
+        payload.razorpay_order_id, payload.razorpay_signature,
+    )
 
 
 @router.post("/razorpay/webhook")
