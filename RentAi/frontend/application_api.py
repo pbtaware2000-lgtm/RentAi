@@ -112,11 +112,12 @@ def request(
             message = response_detail or "This image could not be uploaded. Choose a supported image file."
         elif path.endswith("/images") and exc.code >= 500:
             message = response_detail or "Image storage is temporarily unavailable. Check the server image configuration and try again."
+        elif path.startswith("/chatbot/") and response_detail:
+            message = response_detail
         elif exc.code >= 500:
             message = "RentAI's application service is temporarily unavailable. Please try again later."
         elif exc.code == 409 and response_detail:
             message = response_detail
-        elif exc.code not in {401, 403}:
         elif exc.code not in {401, 403, 409}:
             message = "RentAI could not complete that request. Please try again."
         if path.startswith("/application/payments/razorpay/") and response_detail and exc.code not in {401, 403}:
@@ -215,6 +216,13 @@ def booking_payment_configured() -> bool:
     return bool(request("GET", "/bookings/payment-config").get("configured"))
 
 
+def booking_payment_configuration() -> dict:
+    result = request("GET", "/bookings/payment-config")
+    if not isinstance(result, dict):
+        raise ApplicationAPIError("RentAI returned invalid payment configuration status.")
+    return result
+
+
 def request_booking(property_id: str, move_in_date: str) -> dict:
     return request("POST", "/bookings", payload={"property_id": property_id, "move_in_date": move_in_date})["booking"]
 
@@ -224,7 +232,21 @@ def decide_booking(booking_id: str, decision: str) -> dict:
 
 
 def booking_checkout(booking_id: str) -> dict:
-    return request("POST", f"/bookings/{booking_id}/checkout")
+    result = request("POST", f"/bookings/{quote(booking_id, safe='')}/checkout")
+    if not isinstance(result, dict) or not all(result.get(name) for name in ("key_id", "order_id", "amount", "currency", "booking_id")):
+        raise ApplicationAPIError("RentAI returned incomplete Razorpay booking checkout details.")
+    return result
+
+
+def verify_booking_payment(booking_id: str, payment_id: str, order_id: str, signature: str) -> dict:
+    result = request("POST", f"/bookings/{quote(booking_id, safe='')}/verify", payload={
+        "razorpay_payment_id": payment_id,
+        "razorpay_order_id": order_id,
+        "razorpay_signature": signature,
+    })
+    if not isinstance(result, dict) or result.get("payment_status") != "paid":
+        raise ApplicationAPIError("RentAI could not verify this booking payment yet.")
+    return result
 def create_rent_payment_order(rent_record_id: str) -> dict:
     try:
         api_port = urlsplit(get_api_base_url()).port

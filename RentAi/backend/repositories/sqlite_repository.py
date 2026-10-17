@@ -61,6 +61,15 @@ def initialize_database():
             data TEXT NOT NULL, assigned_broker_uids TEXT NOT NULL DEFAULT '[]',
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
+        CREATE TABLE IF NOT EXISTS chatbot_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            uid TEXT NOT NULL REFERENCES users(uid) ON DELETE CASCADE,
+            role TEXT NOT NULL CHECK(role IN ('user','assistant')),
+            content TEXT NOT NULL,
+            mode TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_chatbot_messages_uid_id ON chatbot_messages(uid, id);
         CREATE TABLE IF NOT EXISTS application_images (
             id TEXT PRIMARY KEY, owner_uid TEXT NOT NULL, uploader_uid TEXT NOT NULL,
             record_id TEXT NOT NULL, url TEXT NOT NULL, format TEXT, width INTEGER, height INTEGER,
@@ -81,6 +90,7 @@ def initialize_database():
         CREATE TABLE IF NOT EXISTS booking_payments (
             id TEXT PRIMARY KEY, booking_id TEXT NOT NULL REFERENCES bookings(id),
             provider TEXT NOT NULL DEFAULT 'razorpay', payment_link_id TEXT UNIQUE,
+            razorpay_order_id TEXT UNIQUE,
             transaction_id TEXT UNIQUE, amount INTEGER NOT NULL, currency TEXT NOT NULL DEFAULT 'INR',
             status TEXT NOT NULL, checkout_url TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
         );
@@ -105,6 +115,13 @@ def initialize_database():
         CREATE INDEX IF NOT EXISTS idx_notification_outbox_due
             ON notification_outbox(status, next_attempt_at, locked_until);
         """)
+        payment_columns = {row["name"] for row in db.execute("PRAGMA table_info(booking_payments)")}
+        if "razorpay_order_id" not in payment_columns:
+            db.execute("ALTER TABLE booking_payments ADD COLUMN razorpay_order_id TEXT")
+        db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_booking_payments_razorpay_order ON booking_payments(razorpay_order_id)")
+        chatbot_columns = {row["name"] for row in db.execute("PRAGMA table_info(chatbot_messages)")}
+        if "mode" not in chatbot_columns:
+            db.execute("ALTER TABLE chatbot_messages ADD COLUMN mode TEXT")
 
 
 def _hash_token(token):
@@ -112,6 +129,27 @@ def _hash_token(token):
 
 
 class SQLiteRepository:
+    def chatbot_history(self, uid, limit=20):
+        with connect() as db:
+            rows = db.execute(
+                "SELECT role,content,mode,created_at FROM chatbot_messages WHERE uid=? ORDER BY id DESC LIMIT ?",
+                (uid, limit),
+            ).fetchall()
+        return [dict(row) for row in reversed(rows)]
+
+    def add_chatbot_message(self, uid, role, content, mode=None):
+        with connect() as db:
+            db.execute("INSERT INTO chatbot_messages(uid,role,content,mode) VALUES(?,?,?,?)", (uid, role, content, mode))
+            db.execute(
+                "DELETE FROM chatbot_messages WHERE uid=? AND id NOT IN "
+                "(SELECT id FROM chatbot_messages WHERE uid=? ORDER BY id DESC LIMIT 40)",
+                (uid, uid),
+            )
+
+    def clear_chatbot_history(self, uid):
+        with connect() as db:
+            db.execute("DELETE FROM chatbot_messages WHERE uid=?", (uid,))
+
     def create_account(self, email, name, password_hash, role):
         uid = uuid.uuid4().hex
         with connect() as db:

@@ -6,6 +6,7 @@ from backend.core.config import startup_configuration_issues
 from frontend.components.sidebar import render_sidebar
 from frontend.components.owner_sidebar import render_owner_sidebar
 from frontend.components.renter_sidebar import render_renter_sidebar
+from frontend.components.chatbot import render as render_chatbot
 from frontend.authentication import (
     AuthenticationError,
     accessible_pages,
@@ -148,3 +149,9 @@ else:
         )
         renderer = PAGE_RENDERERS.get(st.session_state.page) or DASHBOARD_RENDERERS[st.session_state.page]
         renderer(data)
+    active_chat_page = st.session_state.page
+    if st.session_state.page == "Owner Dashboard":
+        active_chat_page = st.session_state.get("owner_active_page", "Dashboard")
+    elif st.session_state.page == "Renter Dashboard":
+        active_chat_page = st.session_state.get("renter_active_page", "Dashboard")
+    render_chatbot(role, signed_in_user["uid"], active_chat_page)

@@ -6,8 +6,8 @@ import logging
 import pandas as pd
 import streamlit as st
 
-from frontend.application_api import (ApplicationAPIError, booking_checkout, booking_notifications, booking_payment_configured,
-                                      bookings as booking_records, create, delete, records, update)
+from frontend.application_api import (ApplicationAPIError, booking_checkout, booking_notifications, booking_payment_configuration,
+                                      bookings as booking_records, create, delete, records, update, verify_booking_payment)
 from frontend.application_api import (
     ApplicationAPIError,
     create,
@@ -756,7 +756,7 @@ def render_bookings(data: pd.DataFrame | None = None) -> None:
     _page_header("My Bookings", "Track owner decisions, payment status, and confirmed owner listings.")
     try:
         items = booking_records()
-        payment_ready = booking_payment_configured()
+        payment_config = booking_payment_configuration()
         notifications = booking_notifications()
     except ApplicationAPIError as exc:
         st.error(str(exc))
@@ -768,45 +768,95 @@ def render_bookings(data: pd.DataFrame | None = None) -> None:
     if not items:
         st.info("You have no booking requests yet. Only published owner listings marked vacant can receive requests.")
         return
+    checkout = st.session_state.get("rentai_booking_checkout")
+    checkout_notice = st.session_state.pop("rentai_booking_checkout_notice", None)
+    verified_booking = st.session_state.pop("rentai_booking_payment_success", None)
+    if checkout_notice:
+        st.info(checkout_notice)
     for item in items:
         prop = item.get("property") or {}
         payment = item.get("latest_payment") or {}
         status = item.get("status", "pending_owner_approval")
+        booking_id = str(item.get("id", ""))
+        payment_status = item.get("payment_status", "pending")
+        try:
+            amount_due = int(item.get("amount_due", 0))
+            deposit = float(item.get("security_deposit", 0))
+        except (TypeError, ValueError):
+            amount_due, deposit = 0, 0
         with st.container(border=True):
             st.subheader(prop.get("title", "Owner listing"))
             st.caption(" · ".join(filter(None, [prop.get("property_type"), f"{prop.get('bedrooms')} bedrooms" if prop.get("bedrooms") is not None else ""])))
             st.caption(" · ".join(filter(None, [prop.get("locality"), prop.get("city")])))
-            cols = st.columns(4)
-            cols[0].metric("Booking ID", str(item.get("id", "")))
-            cols[1].metric("Requested move-in", item.get("move_in_date", "Not recorded"))
-            cols[2].metric("Agreed monthly rent", format_money(item.get("monthly_rent")))
-            cols[3].metric("Booking status", status.replace("_", " ").title())
+            if booking_id:
+                st.caption(f"Booking reference: {booking_id[:12]}…" if len(booking_id) > 12 else f"Booking reference: {booking_id}")
+            cols = st.columns(2)
+            cols[0].metric("Requested move-in", item.get("move_in_date", "Not recorded"))
+            cols[1].metric("Agreed monthly rent", format_money(item.get("monthly_rent")))
+            st.caption(f"Booking status: **{status.replace('_', ' ').title()}** · Payment status: **{payment_status.replace('_', ' ').title()}**")
             st.write(f"**Owner:** {item.get('owner_name', 'Owner')} · {item.get('owner_email', '')}")
-            st.write(f"**Initial payment due:** ₹{int(item.get('amount_due', 0)) / 100:,.2f} INR (first month rent plus listed deposit)")
-            st.write(f"**Deposit:** ₹{float(item.get('security_deposit', 0)):,.0f} INR · **Payment status:** {item.get('payment_status', 'pending').replace('_', ' ').title()}")
+            st.markdown(f"**Initial payment due: ₹{amount_due / 100:,.2f} INR** (first month rent plus listed deposit)")
+            st.write(f"**Deposit:** ₹{deposit:,.2f} INR")
             if payment.get("transaction_id"):
-                st.caption(f"Verified transaction reference: {payment['transaction_id']}")
+                reference_label = "Verified transaction reference" if payment_status == "paid" else "Most recent Razorpay attempt"
+                st.caption(f"{reference_label}: {payment['transaction_id']}")
             if status == "pending_owner_approval":
                 st.info("Awaiting owner approval.")
             elif item.get("availability_conflict"):
-                if item.get("payment_status") == "paid":
+                if payment_status == "paid":
                     st.error("Payment was verified, but availability changed before confirmation. The captured transaction is recorded for manual reconciliation; this booking is not confirmed.")
                 else:
                     st.error("The listing is no longer marked available. Payment is disabled; contact the owner about this request.")
             elif status == "confirmed":
-                st.success("Booking confirmed.")
-            elif status == "accepted_pending_payment" and item.get("payment_status") == "processing":
-                if payment.get("checkout_url"):
-                    st.link_button("Continue to secure Razorpay checkout", payment["checkout_url"], type="primary")
-                st.info("Payment processing. The booking will confirm after Razorpay verifies the capture. Refresh this page to check the status.")
-            elif status == "accepted_pending_payment" and item.get("payment_status") in {"pending", "failed"}:
-                if not payment_ready:
-                    st.warning("Payments are unavailable: the API server needs Razorpay API credentials and a webhook secret.")
-                elif st.button("Pay Now" if item.get("payment_status") == "pending" else "Retry payment", key=f"booking_pay_{item['id']}", type="primary"):
+                st.success("Razorpay verified payment and confirmed this booking." if verified_booking == booking_id else "Booking confirmed after verified payment.")
+            elif status == "accepted_pending_payment" and payment_status == "paid":
+                st.success("Payment verified. The booking is awaiting availability review before confirmation.")
+            elif status == "accepted_pending_payment" and amount_due > 0:
+                active_checkout = checkout if checkout and checkout.get("booking_id") == booking_id else None
+                if payment_status == "processing" and payment.get("checkout_url") and payment.get("payment_link_id"):
+                    st.link_button("Continue existing secure payment", payment["checkout_url"], type="primary")
+                    st.info("This payment attempt was started before the checkout update. RentAI will confirm it after server-side Razorpay verification.")
+                elif active_checkout:
+                    nonce = int(st.session_state.get("rentai_booking_checkout_nonce", 0))
+                    response = razorpay_checkout(
+                        checkout=active_checkout,
+                        key=f"booking-razorpay-{active_checkout['order_id']}-{nonce}",
+                    )
+                    if isinstance(response, dict) and response.get("status") == "checkout_success":
+                        try:
+                            if response.get("razorpay_order_id") != active_checkout.get("order_id"):
+                                raise ApplicationAPIError("Razorpay returned an order that does not match this booking.")
+                            verify_booking_payment(
+                                booking_id, response.get("razorpay_payment_id", ""),
+                                response.get("razorpay_order_id", ""), response.get("razorpay_signature", ""),
+                            )
+                            st.session_state.pop("rentai_booking_checkout", None)
+                            st.session_state.pop("rentai_booking_checkout_nonce", None)
+                            st.session_state["rentai_booking_payment_success"] = booking_id
+                            st.rerun()
+                        except ApplicationAPIError as exc:
+                            st.session_state["rentai_booking_checkout_nonce"] = nonce + 1
+                            st.session_state["rentai_booking_checkout_notice"] = f"RentAI has not verified this payment yet: {exc} The payment remains unconfirmed; refresh the page or continue checkout to check again."
+                            st.rerun()
+                    elif isinstance(response, dict) and response.get("status") in {"checkout_failed", "checkout_cancelled"}:
+                        st.session_state["rentai_booking_checkout_nonce"] = nonce + 1
+                        outcome = "cancelled" if response["status"] == "checkout_cancelled" else "not completed"
+                        st.session_state["rentai_booking_checkout_notice"] = f"Checkout was {outcome}. RentAI has not marked the payment paid; the booking remains unconfirmed. You can continue checkout below."
+                        st.rerun()
+                elif not payment_config.get("configured"):
+                    missing = ", ".join(payment_config.get("missing") or ["Razorpay server credentials"])
+                    st.warning(f"Payments are unavailable. The API server needs valid Test Mode Razorpay credentials. Missing or invalid: {missing}.")
+                elif payment_status in {"pending", "failed", "processing"} and st.button(
+                    "Continue payment" if payment_status == "processing" else ("Retry payment" if payment_status == "failed" else "Pay Now"),
+                    key=f"booking_pay_{booking_id}", type="primary",
+                ):
                     try:
-                        result = booking_checkout(item["id"])
-                        st.link_button("Continue to secure Razorpay checkout", result["checkout_url"], type="primary")
-                        st.info("Payment remains processing until RentAI verifies Razorpay's signed webhook.")
+                        result = booking_checkout(booking_id)
+                        st.session_state["rentai_booking_checkout"] = result
+                        st.session_state["rentai_booking_checkout_nonce"] = 0
+                        st.rerun()
                     except ApplicationAPIError as exc:
                         st.error(str(exc))
+                if payment_status == "processing":
+                    st.info("Payment is awaiting Razorpay verification. It will remain unconfirmed until RentAI verifies the capture.")
 

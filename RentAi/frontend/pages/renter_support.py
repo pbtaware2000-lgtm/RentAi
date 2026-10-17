@@ -317,13 +317,6 @@ def display_property_card(
                     except ApplicationAPIError as exc:
                         st.error(str(exc))
         st.caption("Saving only bookmarks this property; it does not reserve or book it.")
-        if source == "owner_listing" and key_suffix == "search":
-            with c:
-                if st.button("Send enquiry", key=f"enquire_{key_suffix}_{widget_ref}", width="stretch"):
-                    st.session_state[renter_key("enquiry_listing")] = key
-                    st.rerun()
-
-
 def dataset_properties(data: pd.DataFrame) -> list[dict]:
     if data.empty:
         return []

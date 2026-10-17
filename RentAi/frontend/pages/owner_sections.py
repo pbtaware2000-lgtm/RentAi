@@ -173,7 +173,6 @@ def render_add_property(data=None) -> None:
                 help="JPEG, PNG, or WebP · maximum 8 MB. The photo is stored in the project assets folder.",
                 key="owner_add_property_photo",
             )
-            status = st.radio("Listing visibility", ["published", "draft"], horizontal=True, format_func=lambda value: "Listed" if value == "published" else "Keep as draft", key="owner_add_status")
             estimate_col, save_col = st.columns(2)
             status = st.radio("Listing visibility", ["published", "draft", "unlisted"], horizontal=True, format_func=lambda value: {"published": "Published", "draft": "Draft", "unlisted": "Unlisted"}[value], key="owner_add_status")
             st.markdown("**Property Images**")
@@ -1130,10 +1129,6 @@ def render_revenue(_data=None) -> None:
     collected = sum(float((item.get("data") or {}).get("paid_amount", 0) or 0) for item in payments if (item.get("data") or {}).get("status") == "paid")
     outstanding = sum(float((item.get("data") or {}).get("amount", 0) or 0) for item in payments if (item.get("data") or {}).get("status") == "pending")
     a, b, c = st.columns(3)
-    a.metric("Potential monthly listed rent", money(potential))
-    paid_bookings = [item for item in bookings if item.get("payment_status") == "paid"]
-    b.metric("Verified booking payments", money(sum(int(item.get("amount_due", 0)) for item in paid_bookings) / 100))
-    c.metric("Outstanding rent", "Not tracked yet")
     revenue_metrics = (
         (a, "Potential monthly listed rent", potential, "Sum of asking rents for published listings; this is an estimate, not rent due."),
         (b, "Total rent collected", collected, "Sum of paid rent records, using each record's saved paid amount."),
@@ -1151,18 +1146,6 @@ def render_revenue(_data=None) -> None:
         st.dataframe(pd.DataFrame([{"Property": item.get("title", "Property"), "City": item.get("city", ""), "Occupancy": item.get("occupancy_status", "Not tracked"), "Asking rent / month": money(item.get("rent"))} for item in active]), use_container_width=True, hide_index=True)
     else:
         st.info("Publish properties to see expected monthly asking rent.")
-    if paid_bookings:
-        st.subheader("Verified booking transactions")
-        st.dataframe(pd.DataFrame([{
-            "Booking ID": item.get("id"),
-            "Property": (item.get("property") or {}).get("title", "Property"),
-            "Renter": item.get("renter_name", "Renter"),
-            "Amount (INR)": int(item.get("amount_due", 0)) / 100,
-            "Transaction": (item.get("latest_payment") or {}).get("transaction_id", ""),
-            "Booking status": item.get("status", "").replace("_", " ").title(),
-        } for item in paid_bookings]), use_container_width=True, hide_index=True)
-    st.info("Only the initial booking amount is tracked. Monthly rent collection, due dates, refunds, income, and expenses are not recorded.")
-
     active_enquiry_ids = {
         (item.get("data") or {}).get("inquiry_id")
         for item in tenancies if (item.get("data") or {}).get("status") == "active"
