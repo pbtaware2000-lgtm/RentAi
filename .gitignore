@@ -1,0 +1,23 @@
+
+# Virtual environments
+venv/
+.venv/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.sqlite3-journal
+*.sqlite3-wal
+*.sqlite3-shm
+
+# Environment secrets
+.env
+.env.*
+
+# Python cache
+__pycache__/
+*.pyc
+
+!.env.example
