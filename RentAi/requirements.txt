@@ -1,0 +1,15 @@
+streamlit
+fastapi
+uvicorn[standard]
+pandas
+numpy
+scikit-learn
+joblib
+xgboost
+matplotlib
+seaborn
+plotly
+python-dotenv
+cloudinary
+python-multipart
+Pillow

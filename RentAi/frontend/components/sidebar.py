@@ -22,6 +22,7 @@ def render_sidebar(data, role=None, allowed_pages=None, on_logout=None):
 
         if role:
             st.caption(f"Signed in as **{role.title()}**")
+<<<<<<< HEAD
             if role != "admin":
                 st.button("Sign out", key="rentai_logout", width="stretch", on_click=on_logout)
 
@@ -55,6 +56,12 @@ def render_sidebar(data, role=None, allowed_pages=None, on_logout=None):
             st.button("Logout", key="rentai_logout", width="stretch", on_click=on_logout)
             return
 
+=======
+            st.button("Sign out", key="rentai_logout", width="stretch", on_click=on_logout)
+
+        st.divider()
+
+>>>>>>> origin/development
         # =========================
         # MAIN
         # =========================
@@ -97,9 +104,12 @@ def render_sidebar(data, role=None, allowed_pages=None, on_logout=None):
             ("💡  Property Insights", "Property Insights"),
             ("🧪  Algo Lab", "Algo Lab"),
             ("📑  Admin & Reports", "Admin & Reports"),
+<<<<<<< HEAD
             ("My Broker Listings", "My Broker Listings"),
             ("Add New Property", "Add New Property"),
             ("Support & Complaints", "Support & Complaints"),
+=======
+>>>>>>> origin/development
         ]
 
         for label, page in menu_items:

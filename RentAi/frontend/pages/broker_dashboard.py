@@ -21,18 +21,34 @@ def render(_data) -> None:
     c3.metric("Open enquiries", sum((r.get("data") or {}).get("status", "new") not in {"closed", "completed"} for r in inquiries))
     st.subheader("Assigned Properties")
     if listings:
+<<<<<<< HEAD
         st.dataframe(pd.DataFrame([r.get("data", {}) for r in listings]), width="stretch", hide_index=True)
+=======
+        st.dataframe(pd.DataFrame([r.get("data", {}) for r in listings]), use_container_width=True, hide_index=True)
+>>>>>>> origin/development
     else:
         st.info("No properties have been assigned to you.")
     st.subheader("Rental Enquiries and Clients")
     if not inquiries:
         st.info("No enquiries have been assigned to you.")
         return
+<<<<<<< HEAD
     st.dataframe(pd.DataFrame([r.get("data", {}) for r in inquiries]), width="stretch", hide_index=True)
     selected = st.selectbox("Manage enquiry", inquiries, format_func=lambda r: (r.get("data") or {}).get("client_name") or (r.get("data") or {}).get("message", "Enquiry")[:70])
     data = selected.get("data") or {}
     with st.form("broker_update_enquiry"):
         status = st.selectbox("Status", ["new", "contacted", "viewing_scheduled", "completed", "closed"], index=["new", "contacted", "viewing_scheduled", "completed", "closed"].index(data.get("status", "new")))
+=======
+    st.dataframe(pd.DataFrame([r.get("data", {}) for r in inquiries]), use_container_width=True, hide_index=True)
+    selected = st.selectbox("Manage enquiry", inquiries, format_func=lambda r: (r.get("data") or {}).get("client_name") or (r.get("data") or {}).get("message", "Enquiry")[:70])
+    data = selected.get("data") or {}
+    broker_statuses = ["new", "contacted", "viewing_scheduled", "completed", "closed"]
+    current_status = data.get("status", "new")
+    if current_status not in broker_statuses:
+        current_status = "new"
+    with st.form("broker_update_enquiry"):
+        status = st.selectbox("Status", broker_statuses, index=broker_statuses.index(current_status))
+>>>>>>> origin/development
         note = st.text_area("Broker note", value=data.get("broker_note", ""))
         submitted = st.form_submit_button("Update enquiry")
     if submitted:

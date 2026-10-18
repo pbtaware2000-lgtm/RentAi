@@ -6,14 +6,41 @@ import secrets
 import sqlite3
 import uuid
 from contextlib import contextmanager
+<<<<<<< HEAD
+=======
+from datetime import datetime, timezone
+>>>>>>> origin/development
 from pathlib import Path
 
 from backend.core.config import PROJECT_ROOT
 
+<<<<<<< HEAD
 DB_PATH = Path(os.getenv("RENTAI_DATABASE_PATH", PROJECT_ROOT / "data" / "rentai.sqlite3"))
 VALID_ROLES = {"owner", "renter", "broker", "admin"}
 
 
+=======
+
+def resolve_database_path(value: str | os.PathLike | None = None, *, project_root: Path = PROJECT_ROOT) -> Path:
+    """Resolve configured relative SQLite paths from the project root, not CWD."""
+    configured = os.getenv("RENTAI_DATABASE_PATH") if value is None else value
+    if configured is None or not str(configured).strip():
+        configured = project_root / "data" / "rentai.sqlite3"
+    path = Path(configured).expanduser()
+    if not path.is_absolute():
+        path = project_root / path
+    return path.resolve()
+
+
+DB_PATH = resolve_database_path()
+VALID_ROLES = {"owner", "renter", "broker", "admin"}
+
+
+class DuplicateBusinessRecordError(ValueError):
+    """Raised when a tenancy or rent period already exists."""
+
+
+>>>>>>> origin/development
 @contextmanager
 def connect():
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -44,11 +71,24 @@ def initialize_database():
             data TEXT NOT NULL, assigned_broker_uids TEXT NOT NULL DEFAULT '[]',
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
+<<<<<<< HEAD
+=======
+        CREATE TABLE IF NOT EXISTS chatbot_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            uid TEXT NOT NULL REFERENCES users(uid) ON DELETE CASCADE,
+            role TEXT NOT NULL CHECK(role IN ('user','assistant')),
+            content TEXT NOT NULL,
+            mode TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_chatbot_messages_uid_id ON chatbot_messages(uid, id);
+>>>>>>> origin/development
         CREATE TABLE IF NOT EXISTS application_images (
             id TEXT PRIMARY KEY, owner_uid TEXT NOT NULL, uploader_uid TEXT NOT NULL,
             record_id TEXT NOT NULL, url TEXT NOT NULL, format TEXT, width INTEGER, height INTEGER,
             public_id TEXT NOT NULL
         );
+<<<<<<< HEAD
         CREATE TABLE IF NOT EXISTS property_approval_requests (
             request_id TEXT PRIMARY KEY,
             property_id TEXT NOT NULL UNIQUE REFERENCES application_records(id) ON DELETE CASCADE,
@@ -118,6 +158,55 @@ def initialize_database():
                 "UPDATE app_reviews SET role=COALESCE((SELECT role FROM users WHERE users.uid=app_reviews.user_uid),role)"
             )
         db.execute("CREATE INDEX IF NOT EXISTS ix_users_role_created ON users(role, created_at)")
+=======
+        CREATE TABLE IF NOT EXISTS bookings (
+            id TEXT PRIMARY KEY, property_id TEXT NOT NULL REFERENCES application_records(id),
+            renter_uid TEXT NOT NULL REFERENCES users(uid), owner_uid TEXT NOT NULL REFERENCES users(uid),
+            move_in_date TEXT NOT NULL, monthly_rent REAL NOT NULL, security_deposit REAL NOT NULL DEFAULT 0,
+            amount_due INTEGER NOT NULL, currency TEXT NOT NULL DEFAULT 'INR',
+            status TEXT NOT NULL, payment_status TEXT NOT NULL,
+            availability_conflict INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_bookings_renter ON bookings(renter_uid, created_at);
+        CREATE INDEX IF NOT EXISTS idx_bookings_owner ON bookings(owner_uid, created_at);
+        CREATE INDEX IF NOT EXISTS idx_bookings_property_status ON bookings(property_id, status);
+        CREATE TABLE IF NOT EXISTS booking_payments (
+            id TEXT PRIMARY KEY, booking_id TEXT NOT NULL REFERENCES bookings(id),
+            provider TEXT NOT NULL DEFAULT 'razorpay', payment_link_id TEXT UNIQUE,
+            razorpay_order_id TEXT UNIQUE,
+            transaction_id TEXT UNIQUE, amount INTEGER NOT NULL, currency TEXT NOT NULL DEFAULT 'INR',
+            status TEXT NOT NULL, checkout_url TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_booking_payments_booking ON booking_payments(booking_id, created_at);
+        CREATE TABLE IF NOT EXISTS payment_webhook_events (
+            event_id TEXT PRIMARY KEY, received_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS booking_notifications (
+            id TEXT PRIMARY KEY, booking_id TEXT NOT NULL REFERENCES bookings(id),
+            recipient_uid TEXT NOT NULL REFERENCES users(uid), event_type TEXT NOT NULL,
+            message TEXT NOT NULL, created_at TEXT NOT NULL,
+            UNIQUE(booking_id, recipient_uid, event_type)
+        );
+        CREATE INDEX IF NOT EXISTS idx_booking_notifications_recipient ON booking_notifications(recipient_uid, created_at);
+        CREATE TABLE IF NOT EXISTS notification_outbox (
+            id TEXT PRIMARY KEY, event_key TEXT NOT NULL UNIQUE,
+            owner_uid TEXT NOT NULL, event_type TEXT NOT NULL, payload TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending', attempts INTEGER NOT NULL DEFAULT 0,
+            next_attempt_at TEXT NOT NULL, locked_until TEXT, lock_token TEXT,
+            last_error TEXT, created_at TEXT NOT NULL, sent_at TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_notification_outbox_due
+            ON notification_outbox(status, next_attempt_at, locked_until);
+        """)
+        payment_columns = {row["name"] for row in db.execute("PRAGMA table_info(booking_payments)")}
+        if "razorpay_order_id" not in payment_columns:
+            db.execute("ALTER TABLE booking_payments ADD COLUMN razorpay_order_id TEXT")
+        db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_booking_payments_razorpay_order ON booking_payments(razorpay_order_id)")
+        chatbot_columns = {row["name"] for row in db.execute("PRAGMA table_info(chatbot_messages)")}
+        if "mode" not in chatbot_columns:
+            db.execute("ALTER TABLE chatbot_messages ADD COLUMN mode TEXT")
+>>>>>>> origin/development
 
 
 def _hash_token(token):
@@ -125,6 +214,30 @@ def _hash_token(token):
 
 
 class SQLiteRepository:
+<<<<<<< HEAD
+=======
+    def chatbot_history(self, uid, limit=20):
+        with connect() as db:
+            rows = db.execute(
+                "SELECT role,content,mode,created_at FROM chatbot_messages WHERE uid=? ORDER BY id DESC LIMIT ?",
+                (uid, limit),
+            ).fetchall()
+        return [dict(row) for row in reversed(rows)]
+
+    def add_chatbot_message(self, uid, role, content, mode=None):
+        with connect() as db:
+            db.execute("INSERT INTO chatbot_messages(uid,role,content,mode) VALUES(?,?,?,?)", (uid, role, content, mode))
+            db.execute(
+                "DELETE FROM chatbot_messages WHERE uid=? AND id NOT IN "
+                "(SELECT id FROM chatbot_messages WHERE uid=? ORDER BY id DESC LIMIT 40)",
+                (uid, uid),
+            )
+
+    def clear_chatbot_history(self, uid):
+        with connect() as db:
+            db.execute("DELETE FROM chatbot_messages WHERE uid=?", (uid,))
+
+>>>>>>> origin/development
     def create_account(self, email, name, password_hash, role):
         uid = uuid.uuid4().hex
         with connect() as db:
@@ -162,7 +275,11 @@ class SQLiteRepository:
 
     def user_for_token(self, token):
         with connect() as db:
+<<<<<<< HEAD
             row = db.execute("SELECT u.uid,u.email,u.name,u.role FROM sessions s JOIN users u ON u.uid=s.uid WHERE s.token_hash=? AND s.expires_at>datetime('now') AND u.account_status='active'", (_hash_token(token),)).fetchone()
+=======
+            row = db.execute("SELECT u.uid,u.email,u.name,u.role FROM sessions s JOIN users u ON u.uid=s.uid WHERE s.token_hash=? AND s.expires_at>datetime('now')", (_hash_token(token),)).fetchone()
+>>>>>>> origin/development
             return dict(row) if row else None
 
     def revoke_session(self, token):
@@ -178,6 +295,7 @@ class SQLiteRepository:
         if collection != "application_records": raise ValueError("Unsupported collection")
         record_id = uuid.uuid4().hex
         with connect() as db:
+<<<<<<< HEAD
             db.execute("INSERT INTO application_records(id,owner_uid,kind,data,assigned_broker_uids) VALUES(?,?,?,?,?)", (record_id,data["owner_uid"],data["kind"],json.dumps(data.get("data",{})),json.dumps(data.get("assigned_broker_uids",[]))))
         return record_id, data
 
@@ -196,6 +314,180 @@ class SQLiteRepository:
                 (request_id, record_id, data["owner_uid"]),
             )
         return record_id, request_id
+=======
+            kind = data.get("kind")
+            payload = data.get("data", {})
+            if kind in {"tenancy", "rent_payment"}:
+                db.execute("BEGIN IMMEDIATE")
+                for row in db.execute("SELECT kind,data FROM application_records WHERE kind=?", (kind,)):
+                    existing = json.loads(row["data"])
+                    duplicate = (
+                        kind == "tenancy"
+                        and existing.get("inquiry_id") == payload.get("inquiry_id")
+                        and existing.get("status") == "active"
+                    ) or (
+                        kind == "rent_payment"
+                        and existing.get("tenancy_id") == payload.get("tenancy_id")
+                        and existing.get("period") == payload.get("period")
+                    )
+                    if duplicate:
+                        raise DuplicateBusinessRecordError("A matching tenancy or rent period already exists")
+            db.execute("INSERT INTO application_records(id,owner_uid,kind,data,assigned_broker_uids) VALUES(?,?,?,?,?)", (record_id,data["owner_uid"],data["kind"],json.dumps(data.get("data",{})),json.dumps(data.get("assigned_broker_uids",[]))))
+        return record_id, data
+
+    @staticmethod
+    def _utc_now_text():
+        return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+    @staticmethod
+    def _insert_notification(db, event: dict, *, record_id: str | None = None) -> None:
+        now = SQLiteRepository._utc_now_text()
+        payload = dict(event.get("payload") or {})
+        if record_id:
+            payload.setdefault("record_id", record_id)
+        event_key = event.get("event_key") or f"{event['event_type']}:{record_id or uuid.uuid4().hex}"
+        db.execute(
+            """INSERT OR IGNORE INTO notification_outbox
+               (id,event_key,owner_uid,event_type,payload,next_attempt_at,created_at)
+               VALUES(?,?,?,?,?,?,?)""",
+            (uuid.uuid4().hex, event_key, event["owner_uid"], event["event_type"],
+             json.dumps(payload), now, now),
+        )
+
+    def create_with_notification(
+        self, data: dict, notification: dict | None = None, *, prevent_duplicate_enquiry: bool = False,
+    ):
+        """Persist a record and its notification event atomically."""
+        record_id = uuid.uuid4().hex
+        with connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            if prevent_duplicate_enquiry:
+                for row in db.execute(
+                    "SELECT data FROM application_records WHERE kind='inquiry'"
+                ):
+                    existing = json.loads(row["data"])
+                    if (
+                        existing.get("client_uid") == data["data"].get("client_uid")
+                        and existing.get("listing_id") == data["data"].get("listing_id")
+                        and existing.get("status", "new") in {
+                            "new", "pending", "contacted", "viewing_scheduled", "accepted",
+                        }
+                    ):
+                        raise DuplicateBusinessRecordError("An active enquiry already exists")
+            db.execute(
+                "INSERT INTO application_records(id,owner_uid,kind,data,assigned_broker_uids) VALUES(?,?,?,?,?)",
+                (record_id, data["owner_uid"], data["kind"], json.dumps(data.get("data", {})),
+                 json.dumps(data.get("assigned_broker_uids", []))),
+            )
+            if notification:
+                self._insert_notification(db, notification, record_id=record_id)
+        return record_id, data
+
+    def update_maintenance_with_notification(
+        self, record_id: str, expected_status: str, data: dict,
+        notification: dict | None = None,
+    ) -> tuple[str, dict | None]:
+        """Atomically update maintenance and enqueue a status-change event once."""
+        with connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute(
+                "SELECT * FROM application_records WHERE id=? AND kind='maintenance'", (record_id,),
+            ).fetchone()
+            if row is None:
+                return "missing", None
+            current = self._record(row)
+            current_data = current.get("data") or {}
+            requested_status = data.get("status")
+            current_status = current_data.get("status", "open")
+            if current_status not in {expected_status, requested_status}:
+                return "conflict", current
+            db.execute(
+                "UPDATE application_records SET data=? WHERE id=?",
+                (json.dumps(data), record_id),
+            )
+            if current_status != requested_status and notification:
+                self._insert_notification(db, notification, record_id=record_id)
+            return "updated", {**current, "data": data}
+
+    def enqueue_notifications(self, events: list[dict]) -> int:
+        with connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            before = db.total_changes
+            for event in events:
+                self._insert_notification(db, event)
+            return db.total_changes - before
+
+    def claim_notification(self, *, now: str, lease_until: str, lock_token: str) -> dict | None:
+        with connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute(
+                """SELECT * FROM notification_outbox
+                   WHERE (status='pending' AND next_attempt_at<=?)
+                      OR (status='sending' AND locked_until<=?)
+                   ORDER BY created_at,id LIMIT 1""",
+                (now, now),
+            ).fetchone()
+            if row is None:
+                return None
+            db.execute(
+                """UPDATE notification_outbox
+                   SET status='sending', attempts=attempts+1, locked_until=?, lock_token=?
+                   WHERE id=?""",
+                (lease_until, lock_token, row["id"]),
+            )
+            claimed = db.execute(
+                "SELECT * FROM notification_outbox WHERE id=?", (row["id"],),
+            ).fetchone()
+            return self._notification(claimed)
+
+    @staticmethod
+    def _notification(row):
+        result = dict(row)
+        result["payload"] = json.loads(result["payload"])
+        return result
+
+    def mark_notification_sent(self, notification_id: str, lock_token: str, sent_at: str) -> bool:
+        with connect() as db:
+            return db.execute(
+                """UPDATE notification_outbox
+                   SET status='sent',sent_at=?,locked_until=NULL,lock_token=NULL,last_error=NULL
+                   WHERE id=? AND status='sending' AND lock_token=?""",
+                (sent_at, notification_id, lock_token),
+            ).rowcount == 1
+
+    def mark_notification_skipped(self, notification_id: str, lock_token: str, reason: str) -> bool:
+        with connect() as db:
+            return db.execute(
+                """UPDATE notification_outbox
+                   SET status='skipped',last_error=?,locked_until=NULL,lock_token=NULL
+                   WHERE id=? AND status='sending' AND lock_token=?""",
+                (reason[:200], notification_id, lock_token),
+            ).rowcount == 1
+
+    def retry_notification(
+        self, notification_id: str, lock_token: str, *, next_attempt_at: str, error: str,
+    ) -> bool:
+        with connect() as db:
+            return db.execute(
+                """UPDATE notification_outbox
+                   SET status='pending',next_attempt_at=?,last_error=?,locked_until=NULL,lock_token=NULL
+                   WHERE id=? AND status='sending' AND lock_token=?""",
+                (next_attempt_at, error[:200], notification_id, lock_token),
+            ).rowcount == 1
+
+    def notification_counts(self) -> dict[str, int]:
+        with connect() as db:
+            return {row["status"]: row["total"] for row in db.execute(
+                "SELECT status,COUNT(*) AS total FROM notification_outbox GROUP BY status"
+            )}
+
+    def list_notifications(self) -> list[dict]:
+        """Internal worker/test inspection; no public API exposes outbox contents."""
+        with connect() as db:
+            return [self._notification(row) for row in db.execute(
+                "SELECT * FROM notification_outbox ORDER BY created_at,id"
+            )]
+>>>>>>> origin/development
 
     def _record(self, row):
         if not row: return None
@@ -209,20 +501,106 @@ class SQLiteRepository:
             with connect() as db: return db.execute("UPDATE application_records SET data=? WHERE id=?",(json.dumps(data["data"]),record_id)).rowcount>0
         return False
 
+<<<<<<< HEAD
+=======
+    def attach_rent_order_if_pending(self, record_id, order_data):
+        """Attach one provider order to a pending rent record under a write lock."""
+        with connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute(
+                "SELECT kind,data FROM application_records WHERE id=?", (record_id,)
+            ).fetchone()
+            if not row or row["kind"] != "rent_payment":
+                return None
+            data = json.loads(row["data"])
+            if data.get("status") != "pending":
+                return None
+            existing = data.get("razorpay_order")
+            if isinstance(existing, dict) and existing.get("id"):
+                return existing
+            data["razorpay_order"] = order_data
+            db.execute(
+                "UPDATE application_records SET data=? WHERE id=?",
+                (json.dumps(data), record_id),
+            )
+            return order_data
+
+    def mark_rent_paid_if_pending(self, record_id, order_id, payment_data):
+        """Atomically mark a matching pending order paid; repeated callback is safe."""
+        with connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute(
+                "SELECT kind,data FROM application_records WHERE id=?", (record_id,)
+            ).fetchone()
+            if not row or row["kind"] != "rent_payment":
+                return "missing"
+            data = json.loads(row["data"])
+            if data.get("status") == "paid":
+                return "already_paid" if data.get("razorpay_payment_id") == payment_data.get("razorpay_payment_id") else "conflict"
+            if data.get("status") != "pending" or (data.get("razorpay_order") or {}).get("id") != order_id:
+                return "conflict"
+            db.execute(
+                "UPDATE application_records SET data=? WHERE id=?",
+                (json.dumps(payment_data), record_id),
+            )
+            return "paid"
+
+>>>>>>> origin/development
     def delete(self, collection, record_id):
         table="application_images" if collection=="application_images" else "application_records"
         with connect() as db: return db.execute(f"DELETE FROM {table} WHERE id=?",(record_id,)).rowcount>0
 
+<<<<<<< HEAD
+=======
+    def delete_listing_if_unreferenced(self, record_id):
+        with connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            listing = db.execute(
+                "SELECT kind FROM application_records WHERE id=?", (record_id,)
+            ).fetchone()
+            if listing is None or listing["kind"] != "listing":
+                return "missing"
+            if db.execute(
+                "SELECT 1 FROM application_images WHERE record_id=? LIMIT 1", (record_id,)
+            ).fetchone():
+                return "linked"
+            rows = db.execute(
+                "SELECT kind,data FROM application_records WHERE id<>?", (record_id,)
+            ).fetchall()
+            for row in rows:
+                try:
+                    data = json.loads(row["data"])
+                except (TypeError, json.JSONDecodeError):
+                    return "linked"
+                if row["kind"] in {"inquiry", "maintenance", "tenancy", "rent_payment"} and data.get("listing_id") == record_id:
+                    return "linked"
+                if (
+                    row["kind"] == "favorite"
+                    and data.get("source") == "owner_listing"
+                    and data.get("property_id") == record_id
+                ):
+                    return "linked"
+            db.execute("DELETE FROM application_records WHERE id=?", (record_id,))
+            return "deleted"
+
+>>>>>>> origin/development
     def list_records(self):
         with connect() as db: return [self._record(row) for row in db.execute("SELECT * FROM application_records")]
 
     def list_images(self):
         with connect() as db: return [dict(row) for row in db.execute("SELECT * FROM application_images")]
+<<<<<<< HEAD
 
     def get_user_role(self, uid):
         with connect() as db:
             row = db.execute("SELECT role FROM users WHERE uid=? AND account_status='active'", (uid,)).fetchone()
             return row["role"] if row else None
+=======
+        with connect() as db: return [dict(row) for row in db.execute("SELECT * FROM application_images ORDER BY rowid DESC")]
+
+    def get_user_role(self, uid):
+        user=self.account_by_uid(uid); return user["role"] if user else None
+>>>>>>> origin/development
 
     def set_user_role(self, uid, role):
         with connect() as db: db.execute("UPDATE users SET role=? WHERE uid=?",(role,uid))
@@ -231,6 +609,7 @@ class SQLiteRepository:
         with connect() as db: return db.execute("UPDATE users SET role=? WHERE uid=? AND role='pending'",(role,uid)).rowcount==1
 
     def list_user_roles(self):
+<<<<<<< HEAD
         with connect() as db:
             return [dict(r) for r in db.execute(
                 "SELECT uid,email,name,role,account_status,created_at FROM users "
@@ -590,6 +969,9 @@ class SQLiteRepository:
                     continue
                 results.append(item)
             return results
+=======
+        with connect() as db: return [dict(r) for r in db.execute("SELECT uid,email,name,role FROM users")]
+>>>>>>> origin/development
 
     def assign_broker(self, record_id, broker_uid):
         with connect() as db:

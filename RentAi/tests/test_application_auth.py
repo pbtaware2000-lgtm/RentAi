@@ -38,6 +38,16 @@ class MemoryRepository:
     def get_user_role(self, uid):
         return self.records.get(f"role:{uid}")
 
+<<<<<<< HEAD
+=======
+    def assign_broker(self, record_id, broker_uid):
+        record = self.records.get(record_id)
+        if record is None:
+            return None
+        record["assigned_broker_uids"] = sorted(set(record.get("assigned_broker_uids", [])) | {broker_uid})
+        return record["assigned_broker_uids"]
+
+>>>>>>> origin/development
 
 class ApplicationAuthTests(unittest.TestCase):
     @patch("backend.repositories.firestore_repository.FirestoreRepository.create_user_role", return_value=True)
@@ -194,6 +204,35 @@ class ApplicationAuthTests(unittest.TestCase):
             })
         self.assertEqual(caught.exception.status_code, 403)
 
+<<<<<<< HEAD
+=======
+    @patch("backend.services.application_service.get_trusted_user_role", return_value="broker")
+    def test_only_admin_can_assign_verified_broker(self, get_role):
+        repository = MemoryRepository({
+            "listing": {"id": "listing", "owner_uid": "owner-1", "assigned_broker_uids": []}
+        })
+        service = ApplicationService(repository)
+        admin = type("User", (), {"uid": "admin-1", "role": "admin"})()
+        result = service.assign_broker(admin, "listing", "broker-1")
+        self.assertEqual(result["assigned_broker_uids"], ["broker-1"])
+        get_role.assert_called_once_with("broker-1")
+
+    @patch("backend.services.application_service.get_trusted_user_role", return_value="renter")
+    def test_admin_cannot_assign_non_broker(self, get_role):
+        repository = MemoryRepository({"listing": {"id": "listing", "owner_uid": "owner-1"}})
+        service = ApplicationService(repository)
+        admin = type("User", (), {"uid": "admin-1", "role": "admin"})()
+        with self.assertRaises(HTTPException) as caught:
+            service.assign_broker(admin, "listing", "renter-1")
+        self.assertEqual(caught.exception.status_code, 400)
+        get_role.assert_called_once_with("renter-1")
+
+        owner = type("User", (), {"uid": "owner-1", "role": "owner"})()
+        with self.assertRaises(HTTPException) as caught:
+            service.assign_broker(owner, "listing", "broker-1")
+        self.assertEqual(caught.exception.status_code, 403)
+
+>>>>>>> origin/development
     @patch("backend.core.firebase.verify_id_token", return_value={"uid": "operator-1", "role": "admin"})
     @patch("backend.core.firebase.get_firebase_app", return_value=object())
     @patch("backend.repositories.firestore_repository.FirestoreRepository")

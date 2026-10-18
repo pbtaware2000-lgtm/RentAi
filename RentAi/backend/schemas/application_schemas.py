@@ -2,7 +2,11 @@
 
 from typing import Any
 
+<<<<<<< HEAD
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+=======
+from pydantic import BaseModel, Field, HttpUrl
+>>>>>>> origin/development
 
 
 class ApplicationRecordCreate(BaseModel):
@@ -17,6 +21,15 @@ class ApplicationRecordResponse(BaseModel):
     data: dict[str, Any]
 
 
+<<<<<<< HEAD
+=======
+class RazorpayPaymentVerificationRequest(BaseModel):
+    razorpay_payment_id: str = Field(min_length=1, max_length=80)
+    razorpay_order_id: str = Field(min_length=1, max_length=80)
+    razorpay_signature: str = Field(min_length=1, max_length=128)
+
+
+>>>>>>> origin/development
 class ImageMetadataRequest(BaseModel):
     url: HttpUrl
     public_id: str = Field(min_length=1)
@@ -33,6 +46,7 @@ class ImageMetadataResponse(ImageMetadataRequest):
     record_id: str
 
 
+<<<<<<< HEAD
 class RoleGrantRequest(BaseModel):
     role: str = Field(pattern="^(owner|renter|admin)$")
 
@@ -80,6 +94,14 @@ class SupportTicketUpdate(BaseModel):
 class AdminRentalRequestUpdate(BaseModel):
     status: str = Field(pattern="^(new|contacted|viewing_scheduled|completed|closed)$")
     note: str = Field(default="", max_length=2000)
+=======
+class BrokerAssignmentRequest(BaseModel):
+    broker_uid: str = Field(min_length=1)
+
+
+class RoleGrantRequest(BaseModel):
+    role: str = Field(pattern="^(owner|renter|broker|admin)$")
+>>>>>>> origin/development
 
 
 class PublicRegistrationRequest(BaseModel):

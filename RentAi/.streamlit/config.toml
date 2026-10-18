@@ -1,0 +1,4 @@
+[server]
+# Keep Streamlit's native uploader limit aligned with the 10 MiB API default.
+# Raise this only when RENTAI_MAX_IMAGE_UPLOAD_BYTES is also raised.
+maxUploadSize = 10

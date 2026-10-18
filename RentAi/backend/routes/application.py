@@ -2,7 +2,10 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 import logging
+<<<<<<< HEAD
 import math
+=======
+>>>>>>> origin/development
 
 logger = logging.getLogger(__name__)
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -13,6 +16,7 @@ from backend.schemas.application_schemas import (
     ApplicationRecordCreate,
     ApplicationRecordResponse,
     AuthenticatedUserResponse,
+<<<<<<< HEAD
     RoleGrantRequest,
     PublicRegistrationRequest,
     AccountStatusRequest,
@@ -26,10 +30,20 @@ from backend.schemas.application_schemas import (
 from backend.services.application_service import ApplicationService, INQUIRY_TRANSITIONS
 from backend.repositories.sqlite_repository import SQLiteRepository
 from backend.schemas.prediction_schema import RentPredictionRequest
+=======
+    BrokerAssignmentRequest,
+    RoleGrantRequest,
+    PublicRegistrationRequest,
+    RazorpayPaymentVerificationRequest,
+)
+from backend.services.application_service import ApplicationService
+from backend.services.razorpay_service import RazorpayRentService
+>>>>>>> origin/development
 
 router = APIRouter(prefix="/application/records", tags=["application"])
 auth_router = APIRouter(prefix="/application/auth", tags=["application-auth"])
 admin_router = APIRouter(prefix="/application/admin", tags=["application-admin"])
+<<<<<<< HEAD
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
@@ -80,6 +94,12 @@ def submit_app_review(
         raise HTTPException(status_code=503, detail="App review could not be saved") from exc
 
 
+=======
+payments_router = APIRouter(prefix="/application/payments/razorpay", tags=["rent-payments"])
+bearer_scheme = HTTPBearer(auto_error=False)
+
+
+>>>>>>> origin/development
 @auth_router.get("/me", response_model=AuthenticatedUserResponse)
 def current_account(user: CurrentUser = Depends(get_current_user)):
     return {
@@ -90,6 +110,7 @@ def current_account(user: CurrentUser = Depends(get_current_user)):
     }
 
 
+<<<<<<< HEAD
 @auth_router.post("/sign-out", status_code=204)
 def sign_out_account(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
@@ -100,6 +121,8 @@ def sign_out_account(
     SQLiteRepository().revoke_session(credentials.credentials)
 
 
+=======
+>>>>>>> origin/development
 @auth_router.post("/register", status_code=201, response_model=AuthenticatedUserResponse)
 def register_account(
     payload: PublicRegistrationRequest,
@@ -141,7 +164,11 @@ def sign_up_account(payload: dict):
 
 @auth_router.get("/records")
 def list_account_records(
+<<<<<<< HEAD
     kind: str | None = Query(default=None, pattern="^(listing|profile|favorite|inquiry|maintenance)$"),
+=======
+    kind: str | None = Query(default=None, pattern="^(listing|profile|favorite|inquiry|maintenance|tenancy|rent_payment)$"),
+>>>>>>> origin/development
     user: CurrentUser = Depends(get_current_user),
 ):
     try:
@@ -150,6 +177,33 @@ def list_account_records(
         raise HTTPException(status_code=503, detail="Application storage unavailable") from exc
 
 
+<<<<<<< HEAD
+=======
+@payments_router.post("/rent/{rent_record_id}/order")
+def create_rent_order(rent_record_id: str, user: CurrentUser = Depends(get_current_user)):
+    try:
+        return RazorpayRentService().create_order(user, rent_record_id)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail="Razorpay rent payments are temporarily unavailable") from exc
+
+
+@payments_router.post("/verify")
+def verify_rent_payment(
+    payload: RazorpayPaymentVerificationRequest,
+    user: CurrentUser = Depends(get_current_user),
+):
+    try:
+        return RazorpayRentService().verify_payment(
+            user,
+            payment_id=payload.razorpay_payment_id,
+            order_id=payload.razorpay_order_id,
+            signature=payload.razorpay_signature,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail="Razorpay rent verification is temporarily unavailable") from exc
+
+
+>>>>>>> origin/development
 @auth_router.get("/listing-images")
 def list_visible_listing_images(user: CurrentUser = Depends(get_current_user)):
     try:
@@ -158,12 +212,21 @@ def list_visible_listing_images(user: CurrentUser = Depends(get_current_user)):
         raise HTTPException(status_code=503, detail="Application storage unavailable") from exc
 
 
+<<<<<<< HEAD
 @auth_router.get("/approvals")
 def list_my_property_approvals(user: CurrentUser = Depends(get_current_user)):
     requests = SQLiteRepository().list_approval_requests(exclude_broker=user.role == "admin")
     if user.role != "admin":
         requests = [item for item in requests if item.get("submitted_by_uid") == user.uid]
     return {"requests": requests}
+=======
+@auth_router.get("/profile-images")
+def list_visible_profile_images(user: CurrentUser = Depends(get_current_user)):
+    try:
+        return {"images": ApplicationService().list_profile_images_for_user(user)}
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail="Application storage unavailable") from exc
+>>>>>>> origin/development
 
 
 @admin_router.get("/users")
@@ -174,6 +237,7 @@ def list_registered_users(user: CurrentUser = Depends(require_roles("admin"))):
         raise HTTPException(status_code=503, detail="Application storage unavailable") from exc
 
 
+<<<<<<< HEAD
 @admin_router.get("/dashboard")
 def admin_dashboard(user: CurrentUser = Depends(require_roles("admin"))):
     try:
@@ -395,6 +459,8 @@ def admin_analytics(user: CurrentUser = Depends(require_roles("admin"))):
     }
 
 
+=======
+>>>>>>> origin/development
 @router.post("", response_model=ApplicationRecordResponse, status_code=201)
 def create_record(payload: ApplicationRecordCreate, user: CurrentUser = Depends(get_current_user)):
     try:
@@ -431,6 +497,21 @@ def delete_record(record_id: str, user: CurrentUser = Depends(get_current_user))
         raise HTTPException(status_code=503, detail="Application storage unavailable") from exc
 
 
+<<<<<<< HEAD
+=======
+@router.post("/{record_id}/broker-assignment", response_model=ApplicationRecordResponse)
+def assign_broker(
+    record_id: str,
+    payload: BrokerAssignmentRequest,
+    user: CurrentUser = Depends(require_roles("admin")),
+):
+    try:
+        return ApplicationService().assign_broker(user, record_id, payload.broker_uid)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail="Application storage unavailable") from exc
+
+
+>>>>>>> origin/development
 @admin_router.put("/users/{uid}/role", status_code=204)
 def provision_user_role(
     uid: str,

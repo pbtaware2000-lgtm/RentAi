@@ -1,8 +1,16 @@
 """Small HTTP client for authenticated application records."""
 
 import json
+<<<<<<< HEAD
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
+=======
+import logging
+import re
+import uuid
+from urllib.error import HTTPError, URLError
+from urllib.parse import quote, urlencode, urlsplit
+>>>>>>> origin/development
 from urllib.request import Request, urlopen
 
 import streamlit as st
@@ -10,6 +18,13 @@ import streamlit as st
 from backend.core.config import SettingsError, get_api_base_url
 
 
+<<<<<<< HEAD
+=======
+# Temporary, value-free checkout diagnostics; remove after confirming the live flow.
+_payment_logger = logging.getLogger(__name__)
+
+
+>>>>>>> origin/development
 class ApplicationAPIError(RuntimeError):
     def __init__(
         self,
@@ -45,7 +60,19 @@ def _safe_response_detail(error: HTTPError) -> str | None:
     return normalized[:240] or None
 
 
+<<<<<<< HEAD
 def request(method: str, path: str, *, payload: dict | None = None, params: dict | None = None):
+=======
+def request(
+    method: str,
+    path: str,
+    *,
+    payload: dict | None = None,
+    params: dict | None = None,
+    raw_body: bytes | None = None,
+    content_type: str = "application/json",
+):
+>>>>>>> origin/development
     token = st.session_state.get("rentai_id_token")
     if not token:
         raise ApplicationAPIError("Your session has expired. Sign in again.")
@@ -59,10 +86,17 @@ def request(method: str, path: str, *, payload: dict | None = None, params: dict
         if query:
             url += "?" + query
             request_path += "?" + query
+<<<<<<< HEAD
     data = json.dumps(payload).encode("utf-8") if payload is not None else None
     req = Request(url, data=data, headers={
         "Authorization": f"Bearer {token}", "Accept": "application/json",
         "Content-Type": "application/json",
+=======
+    data = raw_body if raw_body is not None else (json.dumps(payload).encode("utf-8") if payload is not None else None)
+    req = Request(url, data=data, headers={
+        "Authorization": f"Bearer {token}", "Accept": "application/json",
+        "Content-Type": content_type,
+>>>>>>> origin/development
     }, method=method)
     try:
         with urlopen(req, timeout=15) as response:
@@ -76,19 +110,52 @@ def request(method: str, path: str, *, payload: dict | None = None, params: dict
             message = "Your account is not allowed to perform that action."
         elif exc.code == 401:
             message = "Your session has expired. Sign in again."
+<<<<<<< HEAD
         if exc.code == 404:
             if record_id:
                 message = "This record is no longer available. Refresh and try again."
+=======
+        elif exc.code == 409:
+            message = response_detail or "This conflicts with an existing request. Refresh and try again."
+        if exc.code == 404:
+            if record_id:
+                message = "This record is no longer available. Refresh and try again."
+            elif path.startswith("/bookings") and response_detail:
+                message = response_detail
+>>>>>>> origin/development
             elif path == "/application/auth/records":
                 message = "RentAI could not find the renter records endpoint."
             elif path == "/application/auth/listing-images":
                 message = "RentAI could not find the listing images endpoint."
+<<<<<<< HEAD
             else:
                 message = "RentAI could not find the requested API endpoint."
         elif exc.code >= 500:
             message = "RentAI's application service is temporarily unavailable. Please try again later."
         elif exc.code not in {401, 403}:
             message = "RentAI could not complete that request. Please try again."
+=======
+            elif path == "/application/auth/profile-images":
+                message = "RentAI could not find the profile images endpoint."
+            else:
+                message = "RentAI could not find the requested API endpoint."
+        elif path.endswith("/images") and exc.code == 413:
+            message = response_detail or "This image exceeds the upload limit. Choose a smaller file."
+        elif path.endswith("/images") and exc.code == 400:
+            message = response_detail or "This image could not be uploaded. Choose a supported image file."
+        elif path.endswith("/images") and exc.code >= 500:
+            message = response_detail or "Image storage is temporarily unavailable. Check the server image configuration and try again."
+        elif path.startswith("/chatbot/") and response_detail:
+            message = response_detail
+        elif exc.code >= 500:
+            message = "RentAI's application service is temporarily unavailable. Please try again later."
+        elif exc.code == 409 and response_detail:
+            message = response_detail
+        elif exc.code not in {401, 403, 409}:
+            message = "RentAI could not complete that request. Please try again."
+        if path.startswith("/application/payments/razorpay/") and response_detail and exc.code not in {401, 403}:
+            message = response_detail
+>>>>>>> origin/development
         raise ApplicationAPIError(
             message,
             status_code=exc.code,
@@ -113,8 +180,33 @@ def listing_images() -> list[dict]:
     return request("GET", "/application/auth/listing-images").get("images", [])
 
 
+<<<<<<< HEAD
 def property_approval_history() -> list[dict]:
     return request("GET", "/application/auth/approvals").get("requests", [])
+=======
+def profile_images() -> list[dict]:
+    return request("GET", "/application/auth/profile-images").get("images", [])
+
+
+def upload_image(record_id: str, content: bytes, filename: str, mime_type: str) -> dict:
+    """Upload validated image bytes through the authenticated FastAPI endpoint."""
+    safe_name = filename.replace("\\", "/").split("/")[-1]
+    safe_name = re.sub(r"[^A-Za-z0-9_.-]", "_", safe_name)[:120] or "image"
+    safe_mime = (
+        mime_type if re.fullmatch(r"image/[A-Za-z0-9.+-]+", mime_type)
+        else "application/octet-stream"
+    )
+    boundary = f"rentai-{uuid.uuid4().hex}"
+    body = (
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="file"; filename="{safe_name}"\r\n'
+        f"Content-Type: {safe_mime}\r\n\r\n"
+    ).encode("utf-8") + content + f"\r\n--{boundary}--\r\n".encode("ascii")
+    return request(
+        "POST", f"/application/records/{quote(record_id, safe='')}/images",
+        raw_body=body, content_type=f"multipart/form-data; boundary={boundary}",
+    )
+>>>>>>> origin/development
 
 
 def create(kind: str, data: dict) -> dict:
@@ -151,6 +243,7 @@ def set_user_role(uid: str, role: str) -> None:
     request("PUT", f"/application/admin/users/{uid}/role", payload={"role": role})
 
 
+<<<<<<< HEAD
 def admin_dashboard() -> dict:
     return request("GET", "/application/admin/dashboard")
 
@@ -217,3 +310,124 @@ def admin_predictions() -> list[dict]:
 
 def admin_test_prediction(features: dict) -> dict:
     return request("POST", "/application/admin/predictions", payload=features)
+=======
+def bookings() -> list[dict]:
+    return request("GET", "/bookings").get("bookings", [])
+
+
+def booking_notifications() -> list[dict]:
+    return request("GET", "/bookings/notifications").get("notifications", [])
+
+
+def booking_payment_configured() -> bool:
+    return bool(request("GET", "/bookings/payment-config").get("configured"))
+
+
+def booking_payment_configuration() -> dict:
+    result = request("GET", "/bookings/payment-config")
+    if not isinstance(result, dict):
+        raise ApplicationAPIError("RentAI returned invalid payment configuration status.")
+    return result
+
+
+def request_booking(property_id: str, move_in_date: str) -> dict:
+    return request("POST", "/bookings", payload={"property_id": property_id, "move_in_date": move_in_date})["booking"]
+
+
+def decide_booking(booking_id: str, decision: str) -> dict:
+    return request("POST", f"/bookings/{booking_id}/decision", payload={"decision": decision})["booking"]
+
+
+def booking_checkout(booking_id: str) -> dict:
+    result = request("POST", f"/bookings/{quote(booking_id, safe='')}/checkout")
+    if not isinstance(result, dict) or not all(result.get(name) for name in ("key_id", "order_id", "amount", "currency", "booking_id")):
+        raise ApplicationAPIError("RentAI returned incomplete Razorpay booking checkout details.")
+    return result
+
+
+def verify_booking_payment(booking_id: str, payment_id: str, order_id: str, signature: str) -> dict:
+    result = request("POST", f"/bookings/{quote(booking_id, safe='')}/verify", payload={
+        "razorpay_payment_id": payment_id,
+        "razorpay_order_id": order_id,
+        "razorpay_signature": signature,
+    })
+    if not isinstance(result, dict) or result.get("payment_status") != "paid":
+        raise ApplicationAPIError("RentAI could not verify this booking payment yet.")
+    return result
+def create_rent_payment_order(rent_record_id: str) -> dict:
+    try:
+        api_port = urlsplit(get_api_base_url()).port
+    except SettingsError:
+        api_port = None
+    _payment_logger.info(
+        "Razorpay checkout stage=order_request_started session_token_present=%s api_port=%s",
+        bool(st.session_state.get("rentai_id_token")), api_port,
+    )
+    try:
+        result = request("POST", f"/application/payments/razorpay/rent/{rent_record_id}/order")
+    except ApplicationAPIError as exc:
+        _payment_logger.warning(
+            "Razorpay checkout stage=order_request_failed http_status=%s",
+            exc.status_code,
+        )
+        raise
+    if not isinstance(result, dict) or not all(result.get(key) for key in ("key_id", "order_id", "amount", "currency")):
+        _payment_logger.error("Razorpay checkout stage=order_response_invalid")
+        raise ApplicationAPIError("RentAI returned incomplete Razorpay checkout details.")
+    _payment_logger.info(
+        "Razorpay checkout stage=order_response_received key_id_present=%s order_id_present=%s amount_present=%s currency=%s",
+        bool(result.get("key_id")), bool(result.get("order_id")),
+        result.get("amount") is not None, result.get("currency"),
+    )
+    return result
+
+
+def verify_rent_payment(payment_id: str, order_id: str, signature: str) -> dict:
+    _payment_logger.info("Razorpay checkout stage=verification_request_started")
+    try:
+        result = request("POST", "/application/payments/razorpay/verify", payload={
+            "razorpay_payment_id": payment_id,
+            "razorpay_order_id": order_id,
+            "razorpay_signature": signature,
+        })
+    except ApplicationAPIError as exc:
+        _payment_logger.warning(
+            "Razorpay checkout stage=verification_request_failed http_status=%s",
+            exc.status_code,
+        )
+        raise
+    if not isinstance(result, dict) or result.get("status") != "paid":
+        _payment_logger.error("Razorpay checkout stage=verification_response_unconfirmed")
+        raise ApplicationAPIError("RentAI could not confirm this payment.")
+    _payment_logger.info("Razorpay checkout stage=verification_confirmed")
+    return result
+
+
+def predict_rent(features: dict) -> float:
+    result = request("POST", "/ml/rent-prediction", payload=features)
+    if not isinstance(result, dict) or isinstance(result.get("predicted_rent"), bool):
+        raise ApplicationAPIError("RentAI returned an invalid rent prediction.")
+    try:
+        return float(result["predicted_rent"])
+    except (KeyError, TypeError, ValueError):
+        raise ApplicationAPIError("RentAI returned an invalid rent prediction.") from None
+
+
+def classify_rent(features: dict) -> str:
+    result = request("POST", "/ml/rent-classification", payload=features)
+    category = result.get("rent_category") if isinstance(result, dict) else None
+    if not isinstance(category, str) or not category.strip():
+        raise ApplicationAPIError("RentAI returned an invalid rent category.")
+    return category
+
+
+def similar_properties_for_features(features: dict, limit: int = 5) -> list[dict]:
+    result = request(
+        "POST", "/ml/similar-properties/search",
+        payload={**features, "limit": limit},
+    )
+    properties = result.get("properties") if isinstance(result, dict) else None
+    if not isinstance(properties, list) or any(not isinstance(item, dict) for item in properties):
+        raise ApplicationAPIError("RentAI returned invalid comparable properties.")
+    return properties
+>>>>>>> origin/development

@@ -10,12 +10,21 @@ RENTER_MENU = (
     ("Compare Properties", "⇄"),
     ("Saved Properties", "♡"),
     ("My Enquiries", "✉"),
+<<<<<<< HEAD
     ("My Profile", "◉"),
     ("Settings", "⚙"),
     ("App Reviews", "★"),
     ("Support & Complaints", "?"),
 )
 
+=======
+    ("Pay Rent", "₹"),
+    ("My Profile", "◉"),
+)
+
+RENTER_MENU = (*RENTER_MENU, ("My Bookings", "▣"))
+
+>>>>>>> origin/development
 
 def _select_page(page: str) -> None:
     st.session_state.renter_active_page = page
@@ -23,6 +32,11 @@ def _select_page(page: str) -> None:
 
 def render_renter_sidebar(*, on_logout) -> None:
     active = st.session_state.get("renter_active_page", "Dashboard")
+<<<<<<< HEAD
+=======
+    if active not in {page for page, _ in RENTER_MENU} | {"My Bookings"}:
+        active = "Dashboard"
+>>>>>>> origin/development
     name = (st.session_state.get(f"renter_profile_name_{st.session_state.get('rentai_uid') or 'session'}")
             or st.session_state.get("rentai_display_name") or "Renter")
     with st.sidebar:
