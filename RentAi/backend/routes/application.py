@@ -2,6 +2,8 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 import logging
+import math
+
 
 logger = logging.getLogger(__name__)
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -12,6 +14,19 @@ from backend.schemas.application_schemas import (
     ApplicationRecordCreate,
     ApplicationRecordResponse,
     AuthenticatedUserResponse,
+    RoleGrantRequest,
+    PublicRegistrationRequest,
+    AccountStatusRequest,
+    AdminRentalRequestUpdate,
+    PropertyReviewRequest,
+    AppReviewSubmit,
+    SupportTicketCreate,
+    SupportTicketUpdate,
+    AdminListingUpdate,
+)
+from backend.services.application_service import ApplicationService, INQUIRY_TRANSITIONS
+from backend.repositories.sqlite_repository import SQLiteRepository
+from backend.schemas.prediction_schema import RentPredictionRequest
     BrokerAssignmentRequest,
     RoleGrantRequest,
     PublicRegistrationRequest,
@@ -20,11 +35,13 @@ from backend.schemas.application_schemas import (
 from backend.services.application_service import ApplicationService
 from backend.services.razorpay_service import RazorpayRentService
 
+
 router = APIRouter(prefix="/application/records", tags=["application"])
 auth_router = APIRouter(prefix="/application/auth", tags=["application-auth"])
 admin_router = APIRouter(prefix="/application/admin", tags=["application-admin"])
 payments_router = APIRouter(prefix="/application/payments/razorpay", tags=["rent-payments"])
 bearer_scheme = HTTPBearer(auto_error=False)
+
 
 
 @auth_router.get("/me", response_model=AuthenticatedUserResponse)
@@ -35,6 +52,7 @@ def current_account(user: CurrentUser = Depends(get_current_user)):
         "name": user.claims.get("name"),
         "email": user.claims.get("email"),
     }
+
 
 
 @auth_router.post("/register", status_code=201, response_model=AuthenticatedUserResponse)
@@ -79,6 +97,9 @@ def sign_up_account(payload: dict):
 @auth_router.get("/records")
 def list_account_records(
     kind: str | None = Query(default=None, pattern="^(listing|profile|favorite|inquiry|maintenance|tenancy|rent_payment)$"),
+
+    kind: str | None = Query(default=None, pattern="^(listing|profile|favorite|inquiry|maintenance|tenancy|rent_payment)$"),
+
     user: CurrentUser = Depends(get_current_user),
 ):
     try:
@@ -111,6 +132,7 @@ def verify_rent_payment(
         raise HTTPException(status_code=503, detail="Razorpay rent verification is temporarily unavailable") from exc
 
 
+
 @auth_router.get("/listing-images")
 def list_visible_listing_images(user: CurrentUser = Depends(get_current_user)):
     try:
@@ -127,12 +149,14 @@ def list_visible_profile_images(user: CurrentUser = Depends(get_current_user)):
         raise HTTPException(status_code=503, detail="Application storage unavailable") from exc
 
 
+
 @admin_router.get("/users")
 def list_registered_users(user: CurrentUser = Depends(require_roles("admin"))):
     try:
         return {"users": ApplicationService().list_users(user)}
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail="Application storage unavailable") from exc
+
 
 
 @router.post("", response_model=ApplicationRecordResponse, status_code=201)

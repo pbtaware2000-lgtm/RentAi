@@ -4,6 +4,9 @@ from typing import Any
 
 from pydantic import BaseModel, Field, HttpUrl
 
+from pydantic import BaseModel, Field, HttpUrl
+
+
 
 class ApplicationRecordCreate(BaseModel):
     kind: str = Field(min_length=1, max_length=40)
@@ -21,6 +24,7 @@ class RazorpayPaymentVerificationRequest(BaseModel):
     razorpay_payment_id: str = Field(min_length=1, max_length=80)
     razorpay_order_id: str = Field(min_length=1, max_length=80)
     razorpay_signature: str = Field(min_length=1, max_length=128)
+
 
 
 class ImageMetadataRequest(BaseModel):
@@ -45,6 +49,7 @@ class BrokerAssignmentRequest(BaseModel):
 
 class RoleGrantRequest(BaseModel):
     role: str = Field(pattern="^(owner|renter|broker|admin)$")
+
 
 
 class PublicRegistrationRequest(BaseModel):

@@ -23,9 +23,11 @@ ROLE_OPERATIONS = {
 }
 
 
+
 class ApplicationService:
     def __init__(self, repository: SQLiteRepository | None = None):
         self.repository = repository or SQLiteRepository()
+
 
     def register_user_role(self, id_token: str, role: str) -> dict:
         uid = sqlite_register_user_role(id_token=id_token, role=role)
@@ -63,11 +65,14 @@ class ApplicationService:
 
     def _images_for_records(self, record_ids: set[str]) -> list[dict]:
         if not record_ids:
+
             return []
         return [
             {key: image.get(key) for key in ("id", "record_id", "url", "format", "width", "height")}
             for image in self.repository.list_images()
             if image.get("record_id") in record_ids and isinstance(image.get("url"), str)
+            if image.get("record_id") in record_ids and isinstance(image.get("url"), str)
+
         ]
 
     def list_users(self, actor: CurrentUser) -> list[dict]:
@@ -75,11 +80,13 @@ class ApplicationService:
             raise HTTPException(status_code=403, detail="Trusted Admin authorization is required")
         return self.repository.list_user_roles()
 
+
     def provision_user_role(
         self, actor: CurrentUser, actor_id_token: str, uid: str, role: str
     ) -> None:
         if actor.role != "admin":
             raise HTTPException(status_code=403, detail="Trusted Admin authorization is required")
+
         grant_role_to_user(actor_id_token=actor_id_token, uid=uid, role=role)
 
     def create_record(self, user: CurrentUser, kind: str, data: dict) -> dict:
@@ -95,6 +102,7 @@ class ApplicationService:
             record_data = self._validate_tenancy_data(user, record_data)
         if kind == "rent_payment":
             record_data = self._validate_rent_payment_data(user, record_data)
+
         if kind == "inquiry":
             listing_id = record_data.get("listing_id")
             listing = self.repository.get("application_records", listing_id) if listing_id else None
@@ -105,6 +113,10 @@ class ApplicationService:
             message = record_data.get("message", "")
             if not isinstance(message, str) or len(message.strip()) > 2000:
                 raise HTTPException(status_code=400, detail="Inquiry message must be 2,000 characters or fewer")
+
+            if not isinstance(message, str) or len(message.strip()) > 2000:
+                raise HTTPException(status_code=400, detail="Inquiry message must be 2,000 characters or fewer")
+
             client_name = record_data.get("client_name", "")
             phone = record_data.get("client_phone", "")
             if not isinstance(client_name, str) or not client_name.strip() or len(client_name.strip()) > 160:
@@ -125,6 +137,7 @@ class ApplicationService:
                 if duplicate:
                     raise HTTPException(status_code=409, detail="You already have an active enquiry for this property.")
             listing_data = listing.get("data") or {}
+
             record_data = {
                 "listing_id": listing_id,
                 "message": message.strip(),
@@ -139,6 +152,7 @@ class ApplicationService:
                     for key in ("title", "locality", "city", "property_type", "rent")
                     if listing_data.get(key) is not None
                 },
+
                 "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             }
         if kind == "maintenance":
@@ -178,6 +192,11 @@ class ApplicationService:
             # The source is required so legacy or malformed clients cannot silently
             # turn an ambiguous property reference into a dataset bookmark.
             source = record_data.get("source")
+
+            # The source is required so legacy or malformed clients cannot silently
+            # turn an ambiguous property reference into a dataset bookmark.
+            source = record_data.get("source")
+
             if source == "catalog":
                 from backend.services.property_service import get_property_by_id
 
@@ -200,6 +219,9 @@ class ApplicationService:
                 "bedrooms", "bathrooms", "area_sqft", "furnishing_status", "parking",
                 "security_deposit", "maintenance", "available_from", "posted_date", "image_url",
                 "image", "photo_url", "image_path", "description", "status",
+
+                "image", "photo_url", "image_path", "description", "status",
+
             }
             snapshot = {key: value for key, value in prop.items() if key in allowed_fields}
             record_data = {"property_id": property_id, "source": source, "property": snapshot}
@@ -227,6 +249,7 @@ class ApplicationService:
             else:
                 message = "This accepted enquiry already has an active tenancy" if kind == "tenancy" else "A rent record already exists for this tenancy and period"
             raise HTTPException(status_code=409, detail=message) from None
+
         return {"id": record_id, **record}
 
     def get_record(self, user: CurrentUser, record_id: str) -> dict:
@@ -280,6 +303,7 @@ class ApplicationService:
             safe_data = {**(record.get("data") or {}), "status": status, "broker_note": note.strip()}
         elif record.get("kind") == "maintenance" and user.role == "owner":
             old_data = record.get("data") or {}
+
             status = safe_data.get("status")
             note = safe_data.get("owner_note", "")
             if status not in {"open", "in_progress", "completed", "cancelled"}:
@@ -358,6 +382,7 @@ class ApplicationService:
                 return updated_record
         if not self.repository.update("application_records", record_id, {"data": safe_data}):
             raise HTTPException(status_code=404, detail="Record not found")
+
         return {**record, "data": safe_data}
 
     def delete_record(self, user: CurrentUser, record_id: str) -> None:
@@ -419,6 +444,7 @@ class ApplicationService:
             raise HTTPException(status_code=404, detail="Record not found")
         return {**record, "assigned_broker_uids": updated}
 
+
     @staticmethod
     def _validate_listing_data(data: dict) -> dict:
         title, city, locality = (data.get(key) for key in ("title", "city", "locality"))
@@ -433,6 +459,10 @@ class ApplicationService:
         status = data.get("status", "draft")
         if status not in {"draft", "published", "unlisted"}:
             raise HTTPException(status_code=400, detail="Listing status must be draft, published, or unlisted")
+
+        if status not in {"draft", "published", "unlisted"}:
+            raise HTTPException(status_code=400, detail="Listing status must be draft, published, or unlisted")
+
         description = data.get("description", "")
         if not isinstance(description, str) or len(description) > 5000:
             raise HTTPException(status_code=400, detail="Listing description must be 5,000 characters or fewer")
@@ -491,6 +521,7 @@ class ApplicationService:
             validated["furnishing_status"] = furnishing.strip()
         return validated
 
+
     @staticmethod
     def _validate_profile_data(data: dict) -> dict:
         record_type = data.get("record_type")
@@ -537,6 +568,7 @@ class ApplicationService:
             return {"record_type": record_type, "name": name.strip(), "phone": phone.strip(), "preferred_city": preferred_city.strip(),
                     "preferred_property_type": property_type, "monthly_budget_min": budget_min, "monthly_budget_max": budget_max,
                     "preferred_bhk": preferred_bhk, "furnishing_preference": furnishing}
+
         if record_type == "owner_settings":
             email_alerts = data.get("email_alerts", True)
             maintenance_alerts = data.get("maintenance_alerts", True)
@@ -551,6 +583,9 @@ class ApplicationService:
     @staticmethod
     def _authorize_kind_operation(user: CurrentUser, kind: str, operation: str) -> None:
         if kind not in {"listing", "profile", "favorite", "inquiry", "maintenance", "tenancy", "rent_payment"}:
+
+        if kind not in {"listing", "profile", "favorite", "inquiry", "maintenance", "tenancy", "rent_payment"}:
+
             raise HTTPException(status_code=400, detail="Unsupported application record kind")
         if user.role == "admin":
             return
@@ -567,6 +602,7 @@ class ApplicationService:
         data = record.get("data") or {}
         assigned = user.uid in record.get("assigned_broker_uids", [])
         if user.role == "broker" and kind in {"listing", "inquiry"}:
+
             if operation not in ({"read", "update"} if kind == "inquiry" else {"read"}) or not assigned:
                 raise HTTPException(status_code=403, detail="Broker is not assigned to this record")
             return
@@ -578,6 +614,7 @@ class ApplicationService:
             if operation == "read" and data.get("renter_uid") == user.uid:
                 return
             raise HTTPException(status_code=403, detail="Rent record belongs to another Renter")
+
         owns_record = record.get("owner_uid") == user.uid
         if kind in {"inquiry", "maintenance"} and user.role == "owner":
             owns_record = data.get("property_owner_uid") == user.uid
@@ -661,3 +698,4 @@ class ApplicationService:
             "amount": tenancy_data["monthly_rent"], "due_date": due_date.isoformat(),
             "status": "pending", "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         }
+

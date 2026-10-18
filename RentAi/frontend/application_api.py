@@ -1,11 +1,14 @@
 """Small HTTP client for authenticated application records."""
 
 import json
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode
 import logging
 import re
 import uuid
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode, urlsplit
+
 from urllib.request import Request, urlopen
 
 import streamlit as st
@@ -15,6 +18,7 @@ from backend.core.config import SettingsError, get_api_base_url
 
 # Temporary, value-free checkout diagnostics; remove after confirming the live flow.
 _payment_logger = logging.getLogger(__name__)
+
 
 
 class ApplicationAPIError(RuntimeError):
@@ -52,6 +56,7 @@ def _safe_response_detail(error: HTTPError) -> str | None:
     return normalized[:240] or None
 
 
+def request(method: str, path: str, *, payload: dict | None = None, params: dict | None = None):
 def request(
     method: str,
     path: str,
@@ -61,6 +66,7 @@ def request(
     raw_body: bytes | None = None,
     content_type: str = "application/json",
 ):
+
     token = st.session_state.get("rentai_id_token")
     if not token:
         raise ApplicationAPIError("Your session has expired. Sign in again.")
@@ -78,6 +84,7 @@ def request(
     req = Request(url, data=data, headers={
         "Authorization": f"Bearer {token}", "Accept": "application/json",
         "Content-Type": content_type,
+
     }, method=method)
     try:
         with urlopen(req, timeout=15) as response:
@@ -98,6 +105,7 @@ def request(
                 message = "This record is no longer available. Refresh and try again."
             elif path.startswith("/bookings") and response_detail:
                 message = response_detail
+
             elif path == "/application/auth/records":
                 message = "RentAI could not find the renter records endpoint."
             elif path == "/application/auth/listing-images":
@@ -122,6 +130,7 @@ def request(
             message = "RentAI could not complete that request. Please try again."
         if path.startswith("/application/payments/razorpay/") and response_detail and exc.code not in {401, 403}:
             message = response_detail
+
         raise ApplicationAPIError(
             message,
             status_code=exc.code,
@@ -168,6 +177,7 @@ def upload_image(record_id: str, content: bytes, filename: str, mime_type: str) 
         "POST", f"/application/records/{quote(record_id, safe='')}/images",
         raw_body=body, content_type=f"multipart/form-data; boundary={boundary}",
     )
+
 
 
 def create(kind: str, data: dict) -> dict:
@@ -323,3 +333,4 @@ def similar_properties_for_features(features: dict, limit: int = 5) -> list[dict
     if not isinstance(properties, list) or any(not isinstance(item, dict) for item in properties):
         raise ApplicationAPIError("RentAI returned invalid comparable properties.")
     return properties
+

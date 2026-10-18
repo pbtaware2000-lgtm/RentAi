@@ -22,6 +22,9 @@ def render(_data) -> None:
     st.subheader("Assigned Properties")
     if listings:
         st.dataframe(pd.DataFrame([r.get("data", {}) for r in listings]), use_container_width=True, hide_index=True)
+
+        st.dataframe(pd.DataFrame([r.get("data", {}) for r in listings]), use_container_width=True, hide_index=True)
+
     else:
         st.info("No properties have been assigned to you.")
     st.subheader("Rental Enquiries and Clients")
@@ -37,6 +40,7 @@ def render(_data) -> None:
         current_status = "new"
     with st.form("broker_update_enquiry"):
         status = st.selectbox("Status", broker_statuses, index=broker_statuses.index(current_status))
+
         note = st.text_area("Broker note", value=data.get("broker_note", ""))
         submitted = st.form_submit_button("Update enquiry")
     if submitted:

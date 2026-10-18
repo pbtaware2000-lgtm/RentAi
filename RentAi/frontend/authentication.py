@@ -13,6 +13,11 @@ ROLE_PAGE_ACCESS={
 "owner":{"Owner Dashboard","Home","Learning Module","Implementation Overview","Dataset & EDA","Rent Prediction","Rent Classification","Property Clustering","Property Search","Property Comparison","Location & Analytics","Property Insights","Algo Lab"},
 "renter":{"Renter Dashboard","Home","Learning Module","Rent Prediction","Rent Classification","Property Search","Property Comparison","Location & Analytics","Property Insights"},
 "broker":{"Broker Dashboard","Home","Learning Module","Rent Prediction","Rent Classification","Property Clustering","Property Search","Property Comparison","Location & Analytics","Property Insights","Algo Lab"},"admin":None}
+
+"owner":{"Owner Dashboard","Home","Learning Module","Implementation Overview","Dataset & EDA","Rent Prediction","Rent Classification","Property Clustering","Property Search","Property Comparison","Location & Analytics","Property Insights","Algo Lab"},
+"renter":{"Renter Dashboard","Home","Learning Module","Rent Prediction","Rent Classification","Property Search","Property Comparison","Location & Analytics","Property Insights"},
+"broker":{"Broker Dashboard","Home","Learning Module","Rent Prediction","Rent Classification","Property Clustering","Property Search","Property Comparison","Location & Analytics","Property Insights","Algo Lab"},"admin":None}
+
 class AuthenticationError(RuntimeError): pass
 
 def normalize_email(email):
@@ -51,6 +56,7 @@ def password_sign_in(email,password):
     if not isinstance(tokens,dict) or not isinstance(tokens.get("id_token"),str) or not tokens["id_token"].strip() or not isinstance(tokens.get("refresh_token"),str) or not tokens["refresh_token"].strip():
         raise AuthenticationError("RentAI returned an invalid authentication response.")
     return tokens
+
 def password_sign_up(email,password,display_name,role="renter"):
     if len(password)<8: raise AuthenticationError("Choose a password with at least 8 characters.")
     return _request("/application/auth/sign-up",{"email":normalize_email(email),"password":password,"name":display_name,"role":role})
@@ -68,15 +74,20 @@ def save_session(session,tokens,user):
     # profile form so its values are initialized from the newly authenticated
     # Owner's API record, even when the same Owner signs in again.
     _clear_owner_profile_state(session)
+
     session["rentai_id_token"]=tokens["id_token"]; session["rentai_refresh_token"]=tokens["refresh_token"]
     session["rentai_expires_at"]=tokens.get("expires_in",2592000)+__import__("time").time()
     session["rentai_uid"]=user["uid"]; session["rentai_role"]=user["role"]; session["rentai_display_name"]=user.get("name",""); session["rentai_email"]=user.get("email","")
 def clear_auth_session(session,*,clear_login_inputs=False,reset_page=True):
     _clear_owner_profile_state(session)
+
+    _clear_owner_profile_state(session)
+
     for key in AUTH_STATE_KEYS: session.pop(key,None)
     if clear_login_inputs:
         for key in LOGIN_INPUT_KEYS: session.pop(key,None)
     if reset_page: session.pop("rentai_selected_role",None); session.pop("rentai_auth_view",None); session["page"]="Home"
+
 def current_session_user(session,now=None):
     token=session.get("rentai_id_token")
     if not token: clear_auth_session(session,reset_page=False); return None

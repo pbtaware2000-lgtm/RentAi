@@ -22,9 +22,43 @@ def render_sidebar(data, role=None, allowed_pages=None, on_logout=None):
 
         if role:
             st.caption(f"Signed in as **{role.title()}**")
+            if role != "admin":
+                st.button("Sign out", key="rentai_logout", width="stretch", on_click=on_logout)
+
+        st.divider()
+
+        if role == "admin":
+            st.caption("ADMIN NAVIGATION")
+            admin_items = (
+                ("Dashboard", "Admin Dashboard"),
+                ("User Management", "User Management"),
+                ("Owner Management", "Owner Management"),
+                ("Renter Management", "Renter Management"),
+                ("Property Approval Requests", "Property Approval Requests"),
+                ("Booking & Rental Requests", "Booking & Rental Requests"),
+                ("Support & Complaints", "Support & Complaints"),
+                ("App Reviews", "App Reviews"),
+                ("Analytics & Reports", "Analytics & Reports"),
+                ("ML Predictions", "ML Predictions"),
+            )
+            for label, page in admin_items:
+                st.button(
+                    label,
+                    key=f"admin_nav_{page}",
+                    width="stretch",
+                    type="primary" if st.session_state.page == page else "secondary",
+                    on_click=_navigate_to,
+                    args=(page,),
+                )
+            st.divider()
+            st.caption("RentAI Administration")
+            st.button("Logout", key="rentai_logout", width="stretch", on_click=on_logout)
+            return
+
             st.button("Sign out", key="rentai_logout", width="stretch", on_click=on_logout)
 
         st.divider()
+
 
         # =========================
         # MAIN
@@ -68,6 +102,10 @@ def render_sidebar(data, role=None, allowed_pages=None, on_logout=None):
             ("💡  Property Insights", "Property Insights"),
             ("🧪  Algo Lab", "Algo Lab"),
             ("📑  Admin & Reports", "Admin & Reports"),
+            ("My Broker Listings", "My Broker Listings"),
+            ("Add New Property", "Add New Property"),
+            ("Support & Complaints", "Support & Complaints"),
+
         ]
 
         for label, page in menu_items:

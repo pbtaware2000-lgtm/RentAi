@@ -7,9 +7,16 @@ import sqlite3
 import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
+
+from datetime import datetime, timezone
+ development
 from pathlib import Path
 
 from backend.core.config import PROJECT_ROOT
+
+DB_PATH = Path(os.getenv("RENTAI_DATABASE_PATH", PROJECT_ROOT / "data" / "rentai.sqlite3"))
+VALID_ROLES = {"owner", "renter", "broker", "admin"}
+
 
 
 def resolve_database_path(value: str | os.PathLike | None = None, *, project_root: Path = PROJECT_ROOT) -> Path:
@@ -70,6 +77,7 @@ def initialize_database():
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
         CREATE INDEX IF NOT EXISTS idx_chatbot_messages_uid_id ON chatbot_messages(uid, id);
+
         CREATE TABLE IF NOT EXISTS application_images (
             id TEXT PRIMARY KEY, owner_uid TEXT NOT NULL, uploader_uid TEXT NOT NULL,
             record_id TEXT NOT NULL, url TEXT NOT NULL, format TEXT, width INTEGER, height INTEGER,
@@ -124,6 +132,7 @@ def initialize_database():
             db.execute("ALTER TABLE chatbot_messages ADD COLUMN mode TEXT")
 
 
+
 def _hash_token(token):
     return hashlib.sha256(token.encode()).hexdigest()
 
@@ -149,6 +158,8 @@ class SQLiteRepository:
     def clear_chatbot_history(self, uid):
         with connect() as db:
             db.execute("DELETE FROM chatbot_messages WHERE uid=?", (uid,))
+
+
 
     def create_account(self, email, name, password_hash, role):
         uid = uuid.uuid4().hex
@@ -188,6 +199,9 @@ class SQLiteRepository:
     def user_for_token(self, token):
         with connect() as db:
             row = db.execute("SELECT u.uid,u.email,u.name,u.role FROM sessions s JOIN users u ON u.uid=s.uid WHERE s.token_hash=? AND s.expires_at>datetime('now')", (_hash_token(token),)).fetchone()
+
+            row = db.execute("SELECT u.uid,u.email,u.name,u.role FROM sessions s JOIN users u ON u.uid=s.uid WHERE s.token_hash=? AND s.expires_at>datetime('now')", (_hash_token(token),)).fetchone()
+
             return dict(row) if row else None
 
     def revoke_session(self, token):
@@ -203,6 +217,24 @@ class SQLiteRepository:
         if collection != "application_records": raise ValueError("Unsupported collection")
         record_id = uuid.uuid4().hex
         with connect() as db:
+            db.execute("INSERT INTO application_records(id,owner_uid,kind,data,assigned_broker_uids) VALUES(?,?,?,?,?)", (record_id,data["owner_uid"],data["kind"],json.dumps(data.get("data",{})),json.dumps(data.get("assigned_broker_uids",[]))))
+        return record_id, data
+
+    def create_listing_with_approval(self, data):
+        """Persist a submitted listing and its review queue entry atomically."""
+        record_id = uuid.uuid4().hex
+        request_id = uuid.uuid4().hex
+        with connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            db.execute(
+                "INSERT INTO application_records(id,owner_uid,kind,data,assigned_broker_uids) VALUES(?,?,'listing',?,'[]')",
+                (record_id, data["owner_uid"], json.dumps(data["data"])),
+            )
+            db.execute(
+                "INSERT INTO property_approval_requests(request_id,property_id,submitted_by_uid) VALUES(?,?,?)",
+                (request_id, record_id, data["owner_uid"]),
+            )
+        return record_id, request_id
             kind = data.get("kind")
             payload = data.get("data", {})
             if kind in {"tenancy", "rent_payment"}:
@@ -376,6 +408,7 @@ class SQLiteRepository:
                 "SELECT * FROM notification_outbox ORDER BY created_at,id"
             )]
 
+
     def _record(self, row):
         if not row: return None
         result=dict(row); result["data"]=json.loads(result["data"]); result["assigned_broker_uids"]=json.loads(result["assigned_broker_uids"]); return result
@@ -430,6 +463,7 @@ class SQLiteRepository:
             )
             return "paid"
 
+
     def delete(self, collection, record_id):
         table="application_images" if collection=="application_images" else "application_records"
         with connect() as db: return db.execute(f"DELETE FROM {table} WHERE id=?",(record_id,)).rowcount>0
@@ -465,15 +499,22 @@ class SQLiteRepository:
             db.execute("DELETE FROM application_records WHERE id=?", (record_id,))
             return "deleted"
 
+
     def list_records(self):
         with connect() as db: return [self._record(row) for row in db.execute("SELECT * FROM application_records")]
 
     def list_images(self):
         with connect() as db: return [dict(row) for row in db.execute("SELECT * FROM application_images")]
+
+    def get_user_role(self, uid):
+        with connect() as db:
+            row = db.execute("SELECT role FROM users WHERE uid=? AND account_status='active'", (uid,)).fetchone()
+            return row["role"] if row else None
         with connect() as db: return [dict(row) for row in db.execute("SELECT * FROM application_images ORDER BY rowid DESC")]
 
     def get_user_role(self, uid):
         user=self.account_by_uid(uid); return user["role"] if user else None
+
 
     def set_user_role(self, uid, role):
         with connect() as db: db.execute("UPDATE users SET role=? WHERE uid=?",(role,uid))
@@ -483,6 +524,9 @@ class SQLiteRepository:
 
     def list_user_roles(self):
         with connect() as db: return [dict(r) for r in db.execute("SELECT uid,email,name,role FROM users")]
+
+        with connect() as db: return [dict(r) for r in db.execute("SELECT uid,email,name,role FROM users")]
+
 
     def assign_broker(self, record_id, broker_uid):
         with connect() as db:

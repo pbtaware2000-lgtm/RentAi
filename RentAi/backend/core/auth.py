@@ -7,6 +7,8 @@ import secrets
 from backend.repositories.sqlite_repository import SQLiteRepository, initialize_database
 
 
+
+
 class AuthenticationServiceError(RuntimeError): pass
 
 
@@ -44,6 +46,7 @@ def create_first_admin_account(email, password, name):
         raise ValueError("Choose a password with at least 8 characters")
     try:
         initialize_database()
+
         return SQLiteRepository().create_first_admin_account(
             email.strip(), name.strip(), _password_hash(password)
         )
@@ -59,6 +62,9 @@ def sign_in(email, password):
     user=SQLiteRepository().account_by_email(email)
     if not user or not _password_matches(password, user["password_hash"]):
         raise ValueError("Email or password is incorrect")
+    if user.get("account_status", "active") != "active":
+        raise ValueError("This account is deactivated. Contact a RentAI Admin.")
+
     return user["uid"], SQLiteRepository().issue_session(user["uid"])
 
 
@@ -76,6 +82,7 @@ def grant_role_to_user(*, actor_id_token, uid, role):
     if role not in {"owner","renter","broker","admin"}: raise ValueError("Unsupported role")
     if not SQLiteRepository().account_by_uid(uid): raise ValueError("Account not found")
     SQLiteRepository().set_user_role(uid, role)
+
 
 
 def register_user_role(*, id_token, role):

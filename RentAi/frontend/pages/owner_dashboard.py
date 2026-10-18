@@ -13,6 +13,7 @@ from frontend.application_api import ApplicationAPIError, bookings as booking_re
 
 
 def calculate_metrics(listings: list[dict], enquiries: list[dict], maintenance: list[dict], rent_payments: list[dict] | None = None) -> dict:
+
     """Calculate dashboard values from API-authorized records only."""
     details = [record.get("data") or {} for record in listings]
     published = [item for item in details if item.get("status") == "published"]
@@ -23,6 +24,7 @@ def calculate_metrics(listings: list[dict], enquiries: list[dict], maintenance: 
     unknown = len(details) - occupied - vacant
     pending_statuses = {"new", "pending", "contacted", "viewing_scheduled"}
     new_enquiries = sum((record.get("data") or {}).get("status", "new") in pending_statuses for record in enquiries)
+
     rent = 0.0
     for item in published:
         try:
@@ -261,6 +263,8 @@ def _metric_card(column, label: str, value: str | int, hint: str, accent: str) -
 def render(_data=None) -> None:
     st.markdown("""
     <style>
+
+
       .owner-hero { background:linear-gradient(115deg,#07101f 0%,#132c48 70%,#17415e 100%);
         border-radius:18px; padding:1.5rem 1.8rem; margin:.25rem 0 1.25rem; color:#f8fafc; }
       .owner-hero h1 { color:#fff!important; font-size:1.8rem!important; margin:0 0 .35rem; }
@@ -283,17 +287,24 @@ def render(_data=None) -> None:
       div[data-testid='stVerticalBlockBorderWrapper']:has(.owner-kpi-accent) [data-testid='stCaptionContainer'] {
         min-height:2.6em; color:#64748b; font-size:.76rem; line-height:1.3; text-align:left;
       }
+
       .owner-section-note { color:#64748b; font-size:.88rem; }
     </style>
     """, unsafe_allow_html=True)
     records = load_or_report()
     if records is None:
         render_dataset_analytics(_data)
+
+        render_dataset_analytics(_data)
+
         return
     listings = records["listings"]
     enquiries = records["enquiries"]
     maintenance = records["maintenance"]
     metrics = calculate_metrics(listings, enquiries, maintenance, records.get("rent_payments", []))
+
+    metrics = calculate_metrics(listings, enquiries, maintenance, records.get("rent_payments", []))
+
     details = metrics["details"]
     published = metrics["published"]
 
@@ -323,6 +334,7 @@ def render(_data=None) -> None:
     st.subheader("Portfolio activity")
     activity = st.columns(3)
     _metric_card(activity[0], "Pending enquiries", metrics["new_enquiries"], f"of {len(enquiries)} total messages", "#ff6b1a")
+
     _metric_card(activity[1], "Enquiry messages", len(enquiries), "Renter enquiries for your properties", "#60a5fa")
     _metric_card(activity[2], "Maintenance requests", len(maintenance), "Open and recorded work items", "#8b5cf6")
 
@@ -344,6 +356,7 @@ def render(_data=None) -> None:
     _metric_card(revenue[2], "Outstanding rent", money(metrics["rent_outstanding"]), "Pending rent records in your portfolio", "#f59e0b")
 
     render_dataset_analytics(_data)
+
 
     st.subheader("Portfolio overview")
     chart_col, table_col = st.columns([1, 1.2])
@@ -378,6 +391,7 @@ def render(_data=None) -> None:
                 gridcolor="#ffffff", zerolinecolor="#ffffff",
             )
             st.plotly_chart(rent_chart, width="stretch", key="owner-portfolio-asking-rent", config={"displayModeBar": False})
+
         else:
             st.info("No published listings yet. Add a property and publish it to see potential rent here.")
     with table_col, st.container(border=True):
@@ -390,6 +404,9 @@ def render(_data=None) -> None:
                 "Occupancy": {"occupied": "Occupied", "vacant": "Vacant"}.get(item.get("occupancy_status"), "Not tracked"),
                 "Monthly rent": money(item.get("rent")),
             } for item in details]), use_container_width=True, hide_index=True)
+
+            } for item in details]), use_container_width=True, hide_index=True)
+
         else:
             st.info("Your portfolio is empty. Add your first property to start tracking listings and enquiries.")
 
@@ -418,10 +435,14 @@ def render(_data=None) -> None:
     else:
         st.info("Add a property to see your recent portfolio activity.")
 
+
     st.subheader("Upcoming activities")
     dated = [item.get("data") or {} for item in maintenance
              if (item.get("data") or {}).get("due_date", "") >= date.today().isoformat()]
     if dated:
         st.dataframe(pd.DataFrame(dated), use_container_width=True, hide_index=True)
+
+        st.dataframe(pd.DataFrame(dated), use_container_width=True, hide_index=True)
+
     else:
         st.caption("No upcoming maintenance dates are recorded.")

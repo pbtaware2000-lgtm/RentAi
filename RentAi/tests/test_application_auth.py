@@ -46,6 +46,7 @@ class MemoryRepository:
         return record["assigned_broker_uids"]
 
 
+
 class ApplicationAuthTests(unittest.TestCase):
     @patch("backend.repositories.firestore_repository.FirestoreRepository.create_user_role", return_value=True)
     @patch("firebase_admin.auth.get_user")
@@ -226,6 +227,7 @@ class ApplicationAuthTests(unittest.TestCase):
         with self.assertRaises(HTTPException) as caught:
             service.assign_broker(owner, "listing", "broker-1")
         self.assertEqual(caught.exception.status_code, 403)
+
 
     @patch("backend.core.firebase.verify_id_token", return_value={"uid": "operator-1", "role": "admin"})
     @patch("backend.core.firebase.get_firebase_app", return_value=object())
