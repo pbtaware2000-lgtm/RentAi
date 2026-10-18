@@ -1,11 +1,6 @@
 """Presentation functions for secondary Owner workspace sections."""
 
 import pandas as pd
-<<<<<<< HEAD
-import streamlit as st
-from datetime import date
-import math
-=======
 import plotly.express as px
 import streamlit as st
 from datetime import date
@@ -13,15 +8,11 @@ from html import escape
 import hashlib
 import math
 import re
->>>>>>> origin/development
+
 from pydantic import ValidationError
 
 from backend.schemas.prediction_schema import RentPredictionRequest
 from backend.services.prediction_service import predict_rent
-<<<<<<< HEAD
-from frontend.application_api import ApplicationAPIError, create, delete, property_approval_history, records, update
-from frontend.components.data_utils import category_options
-=======
 from frontend.application_api import (ApplicationAPIError, booking_notifications, bookings as booking_records,
                                       create, decide_booking, delete, records, update)
 from backend.services.image_service import MAX_IMAGE_BYTES
@@ -40,15 +31,13 @@ from frontend.application_api import (
 )
 from frontend.components.data_utils import category_options
 from frontend.components.property_images import store_owner_image
->>>>>>> origin/development
+
 from frontend.pages.owner_support import load_or_report, money, owner_name, rows
 
 
 PROPERTY_TYPES = ["Apartment", "House", "Villa", "Studio", "Other"]
 
 
-<<<<<<< HEAD
-=======
 def _upload_selected_owner_image(uploaded_file, record_id: str, session_key: str, label: str) -> None:
     """Upload once when a photo is selected; offer an explicit retry after errors."""
     if uploaded_file is None:
@@ -87,13 +76,11 @@ def _upload_selected_owner_image(uploaded_file, record_id: str, session_key: str
         st.rerun()
 
 
->>>>>>> origin/development
+
 def _property_options(listings: list[dict]):
     return listings or []
 
 
-<<<<<<< HEAD
-=======
 def _validated_property_photos(uploaded_files, saved_count: int, record_id: str | None = None) -> bool:
     """Validate the existing plus newly selected listing photo count and sizes."""
     photos = list(uploaded_files or [])
@@ -145,7 +132,6 @@ def _upload_property_photos(uploaded_files, record_id: str, saved_count: int) ->
     return True
 
 
->>>>>>> origin/development
 def _property_label(record: dict) -> str:
     data = record.get("data") or {}
     return f"{data.get('title', 'Property')} · {data.get('locality', '')} · {record.get('id', '')[:8]}"
@@ -153,39 +139,26 @@ def _property_label(record: dict) -> str:
 
 def render_add_property(data=None) -> None:
     st.title("Add New Property")
-<<<<<<< HEAD
-    role = st.session_state.get("rentai_role", "owner")
-    st.caption("Submit a property for Admin approval or save it as a draft.")
-=======
     st.caption("Create a listing in your private Owner portfolio.")
     property_types = category_options(data, "property_type") if isinstance(data, pd.DataFrame) else []
     property_types = property_types or PROPERTY_TYPES
     furnishing_options = category_options(data, "furnishing_status") if isinstance(data, pd.DataFrame) else []
->>>>>>> origin/development
+
+
     with st.container(border=True):
         with st.form("owner_workspace_add_property", clear_on_submit=False):
             title = st.text_input("Property title *", placeholder="e.g. Sunny 2 bedroom apartment", key="owner_add_title")
             first, second, third = st.columns(3)
             city = first.text_input("City *", key="owner_add_city")
             locality = second.text_input("Locality *", key="owner_add_locality")
-<<<<<<< HEAD
-            property_type = third.selectbox("Property type", PROPERTY_TYPES, key="owner_add_property_type")
-=======
             property_type = third.selectbox("Property type", property_types, key="owner_add_property_type")
->>>>>>> origin/development
+
+            property_type = third.selectbox("Property type", property_types, key="owner_add_property_type")
+
             rent_col, bed_col, occupancy_col = st.columns(3)
             rent = rent_col.number_input("Monthly asking rent (₹) *", min_value=1, step=1000, key="owner_add_asking_rent")
             bedrooms = bed_col.number_input("Bedrooms", min_value=1, max_value=30, step=1, key="owner_add_bedrooms")
             occupancy = occupancy_col.selectbox("Occupancy", ["vacant", "occupied", "not_tracked"], format_func=lambda value: {"vacant": "Vacant", "occupied": "Occupied", "not_tracked": "Not tracked"}[value], key="owner_add_occupancy")
-<<<<<<< HEAD
-
-            features_first, features_second, features_third = st.columns(3)
-            area_sqft = features_first.number_input("Area (sq ft) for estimate", min_value=0.0, value=0.0, step=50.0, key="owner_add_area_sqft")
-            bathrooms = features_second.number_input("Bathrooms for estimate", min_value=0, value=0, step=1, key="owner_add_bathrooms")
-            floor = features_third.number_input("Floor for estimate", min_value=0, value=0, step=1, key="owner_add_floor")
-
-            furnishing_options = category_options(data, "furnishing_status") if isinstance(data, pd.DataFrame) else []
-=======
             security_deposit = st.number_input("Security deposit amount", min_value=0, step=5000, key="owner_add_security_deposit")
 
             features_first, features_second, features_third = st.columns(3)
@@ -193,7 +166,7 @@ def render_add_property(data=None) -> None:
             bathrooms = features_second.number_input("Bathrooms", min_value=0, value=1, step=1, key="owner_add_bathrooms")
             floor = features_third.number_input("Floor for estimate", min_value=0, value=0, step=1, key="owner_add_floor")
 
->>>>>>> origin/development
+
             model_first, model_second, model_third = st.columns(3)
             if furnishing_options:
                 furnishing_status = model_first.selectbox("Furnishing for estimate", furnishing_options, key="owner_add_furnishing")
@@ -204,13 +177,6 @@ def render_add_property(data=None) -> None:
             parking = st.number_input("Parking spaces for estimate", min_value=0, value=0, step=1, key="owner_add_parking")
             st.caption("An optional ML estimate is separate from your monthly asking rent and will not change it.")
             description = st.text_area("Description", max_chars=5000, key="owner_add_description")
-<<<<<<< HEAD
-            status = st.radio("Listing status", ["published", "draft"], horizontal=True, format_func=lambda value: "Submit for approval" if value == "published" else "Keep as draft", key="owner_add_status")
-            estimate_col, save_col = st.columns(2)
-            estimate_clicked = estimate_col.form_submit_button("Estimate monthly rent", key="owner_estimate_rent", width="stretch")
-            submitted = save_col.form_submit_button("Save property", key="owner_save_property", type="primary", width="stretch")
-
-=======
             property_photo = st.file_uploader(
                 "Property photo (optional)", type=["jpg", "jpeg", "png", "webp"],
                 help="JPEG, PNG, or WebP · maximum 8 MB. The photo is stored in the project assets folder.",
@@ -234,7 +200,7 @@ def render_add_property(data=None) -> None:
         if preview_clicked:
             _show_property_photo_previews(property_photos)
 
->>>>>>> origin/development
+
         prediction_features = {
             "city": city,
             "locality": locality,
@@ -251,12 +217,6 @@ def render_add_property(data=None) -> None:
         if estimate_clicked:
             st.session_state.pop("owner_rent_estimate", None)
             try:
-<<<<<<< HEAD
-                validated_features = RentPredictionRequest.model_validate(prediction_features).model_dump()
-                predicted_rent = predict_rent(validated_features)
-                if not math.isfinite(predicted_rent) or predicted_rent <= 0:
-                    raise ValueError("The model did not produce a positive monthly estimate.")
-=======
                 validated_features = RentPredictionRequest.model_validate(prediction_features).model_dump(exclude_unset=True)
                 predicted_rent = predict_rent(validated_features)
                 if not math.isfinite(predicted_rent) or predicted_rent <= 0:
@@ -282,44 +242,22 @@ def render_add_property(data=None) -> None:
                     similar = similar_properties_for_features(similarity_features, limit=3)
                 except ApplicationAPIError as exc:
                     st.warning(f"Comparable dataset properties are unavailable: {exc}")
->>>>>>> origin/development
+
                 st.session_state["owner_rent_estimate"] = {
                     "features": validated_features,
                     "asking_rent": rent,
                     "predicted_rent": predicted_rent,
-<<<<<<< HEAD
-                }
-            except (ValidationError, FileNotFoundError, ValueError) as exc:
-=======
                     "rent_category": rent_category,
                     "similar_properties": similar,
                 }
             except (ApplicationAPIError, ValidationError, ValueError) as exc:
->>>>>>> origin/development
+
                 st.error(f"Could not estimate rent: {exc}")
 
         if submitted:
             if not title.strip() or not city.strip() or not locality.strip():
                 st.error("Complete the title, city, and locality fields.")
                 return
-<<<<<<< HEAD
-            try:
-                create("listing", {
-                    "title": title.strip(), "city": city.strip(), "locality": locality.strip(),
-                    "property_type": property_type, "rent": rent, "bedrooms": bedrooms,
-                    "bathrooms": int(bathrooms), "area_sqft": float(area_sqft), "floor": int(floor),
-                    "furnishing_status": furnishing_status, "parking": int(parking),
-                    "occupancy_status": occupancy, "description": description.strip(), "status": status,
-                })
-                st.success("Property submitted for Admin approval." if status == "published" else "Property saved as a draft.")
-                st.session_state.pop("owner_rent_estimate", None)
-                if role == "owner":
-                    st.session_state.owner_active_page = "My Properties"
-                else:
-                    st.session_state.page = "My Broker Listings"
-                st.rerun()
-            except ApplicationAPIError as exc:
-=======
             if not _validated_property_photos(property_photos, 0):
                 return
             try:
@@ -356,17 +294,16 @@ def render_add_property(data=None) -> None:
                 st.session_state.owner_active_page = "My Properties"
                 st.rerun()
             except (ApplicationAPIError, ValueError) as exc:
->>>>>>> origin/development
+
                 st.error(str(exc))
 
         estimate = st.session_state.get("owner_rent_estimate")
         if estimate:
             try:
-<<<<<<< HEAD
-                current_features = RentPredictionRequest.model_validate(prediction_features).model_dump()
-=======
                 current_features = RentPredictionRequest.model_validate(prediction_features).model_dump(exclude_unset=True)
->>>>>>> origin/development
+
+                current_features = RentPredictionRequest.model_validate(prediction_features).model_dump(exclude_unset=True)
+
             except ValidationError:
                 current_features = None
             if estimate["features"] != current_features:
@@ -376,8 +313,6 @@ def render_add_property(data=None) -> None:
                 asking_col.metric("Monthly asking rent", f"₹{estimate['asking_rent']:,.0f} INR")
                 predicted_col.metric("ML-predicted monthly rent", f"₹{estimate['predicted_rent']:,.0f} INR")
                 st.caption("The estimate is informational only. Saving this property uses the asking rent above.")
-<<<<<<< HEAD
-=======
                 if estimate.get("rent_category"):
                     st.metric("Estimated rent category", estimate["rent_category"])
                 similar = estimate.get("similar_properties") or []
@@ -392,17 +327,11 @@ def render_add_property(data=None) -> None:
                         "Bedrooms": item.get("bedrooms", ""),
                         "Dataset rent": money(item.get("rent")),
                     } for item in similar]), use_container_width=True, hide_index=True)
->>>>>>> origin/development
+
 
 
 def render_properties(_data=None) -> None:
     st.title("My Properties")
-<<<<<<< HEAD
-    st.caption("Only listings owned by your account are shown here.")
-    try:
-        listings = records("listing")
-        approvals = property_approval_history()
-=======
     update_feedback = st.session_state.pop("owner_property_update_feedback", None)
     if update_feedback:
         st.success(update_feedback)
@@ -414,7 +343,7 @@ def render_properties(_data=None) -> None:
     try:
         listings = records("listing")
         tenancies = records("tenancy")
->>>>>>> origin/development
+
     except ApplicationAPIError as exc:
         st.error(str(exc))
         return
@@ -424,45 +353,6 @@ def render_properties(_data=None) -> None:
             st.session_state.owner_active_page = "Add New Property"
             st.rerun()
         return
-<<<<<<< HEAD
-    st.dataframe(rows(listings), width="stretch", hide_index=True)
-    decision_rows = [{
-        "Property": (item.get("property") or {}).get("title", item.get("property_id")),
-        "Status": item.get("status"), "Review notes": item.get("review_notes", ""),
-        "Reviewed at": item.get("reviewed_at", ""),
-    } for item in approvals]
-    if decision_rows:
-        st.subheader("Admin review decisions")
-        st.dataframe(pd.DataFrame(decision_rows), width="stretch", hide_index=True)
-    selected = st.selectbox("Edit a property", listings, format_func=_property_label, key="owner_property_edit_selector")
-    current = selected.get("data") or {}
-    with st.form("owner_workspace_edit_property"):
-        title = st.text_input("Title", value=current.get("title", ""))
-        cols = st.columns(3)
-        city = cols[0].text_input("City", value=current.get("city", ""))
-        locality = cols[1].text_input("Locality", value=current.get("locality", ""))
-        type_index = PROPERTY_TYPES.index(current["property_type"]) if current.get("property_type") in PROPERTY_TYPES else len(PROPERTY_TYPES) - 1
-        property_type = cols[2].selectbox("Property type", PROPERTY_TYPES, index=type_index)
-        cols2 = st.columns(3)
-        rent = cols2[0].number_input("Monthly asking rent (₹)", min_value=1, value=max(1, int(current.get("rent", 1) or 1)), step=1000)
-        bedrooms = cols2[1].number_input("Bedrooms", min_value=1, max_value=30, value=min(30, max(1, int(current.get("bedrooms", 1) or 1))))
-        occupancy_values = ["vacant", "occupied", "not_tracked"]
-        occupancy = cols2[2].selectbox("Occupancy", occupancy_values, index=occupancy_values.index(current.get("occupancy_status", "not_tracked")) if current.get("occupancy_status", "not_tracked") in occupancy_values else 2, format_func=lambda value: {"vacant": "Vacant", "occupied": "Occupied", "not_tracked": "Not tracked"}[value])
-        description = st.text_area("Description", value=current.get("description", ""), max_chars=5000)
-        status_choices = ["draft", "published"]
-        if current.get("status") not in status_choices:
-            status_choices.append(current.get("status"))
-        listing_status = st.selectbox("Listing status", status_choices, index=status_choices.index(current.get("status", "draft")), format_func=lambda value: {"published": "Approved and listed", "pending": "Pending Admin approval", "rejected": "Rejected", "inactive": "Inactive", "draft": "Draft"}.get(value, value.title()))
-        submitted = st.form_submit_button("Save changes", type="primary")
-    if submitted:
-        try:
-            update(selected, {"title": title.strip(), "city": city.strip(), "locality": locality.strip(), "property_type": property_type, "rent": rent, "bedrooms": bedrooms, "occupancy_status": occupancy, "description": description.strip(), "status": listing_status})
-            st.success("Property updated.")
-            st.rerun()
-        except ApplicationAPIError as exc:
-            st.error(str(exc))
-    if st.button("Delete this property", key=f"delete_owner_property_{selected['id']}"):
-=======
 
     filters = st.columns([1.4, 1, 1])
     search = filters[0].text_input("Search properties", placeholder="Title, city, or locality", key="owner_property_search").strip().casefold()
@@ -628,13 +518,12 @@ def render_properties(_data=None) -> None:
         key=f"confirm_delete_owner_property_{selected['id']}",
     )
     if st.button("Delete property", key=f"delete_owner_property_{selected['id']}", disabled=not confirm_delete):
->>>>>>> origin/development
+
         try:
             delete(selected)
             st.success("Property removed from your portfolio.")
             st.rerun()
         except ApplicationAPIError as exc:
-<<<<<<< HEAD
             st.error(str(exc))
 
 
@@ -657,14 +546,14 @@ def render_broker_listings(_data=None) -> None:
         "Status": item.get("status"), "Review notes": item.get("review_notes", ""),
         "Reviewed at": item.get("reviewed_at", ""),
     } for item in approvals]), width="stretch", hide_index=True)
-=======
             st.error(exc.response_detail if exc.status_code == 409 and exc.response_detail else str(exc))
->>>>>>> origin/development
+
+            st.error(exc.response_detail if exc.status_code == 409 and exc.response_detail else str(exc))
+
 
 
 def render_enquiries(_data=None) -> None:
     st.title("Applications & Enquiries")
-<<<<<<< HEAD
     st.caption("This workspace currently stores renter enquiries. Formal applications are not part of the database yet.")
     try:
         enquiries = records("inquiry")
@@ -699,7 +588,6 @@ def render_enquiries(_data=None) -> None:
             st.rerun()
         except ApplicationAPIError as exc:
             st.error(str(exc))
-=======
     st.caption("Review enquiries sent by Renters about your published properties and update your response status.")
     if st.session_state.pop("owner_enquiry_updated", False):
         st.success("Enquiry status updated.")
@@ -758,7 +646,7 @@ def render_enquiries(_data=None) -> None:
                     st.rerun()
                 except ApplicationAPIError as exc:
                     st.error(f"The enquiry status was not updated. {exc}")
->>>>>>> origin/development
+
 
 
 def render_renters(_data=None) -> None:
@@ -781,19 +669,16 @@ def render_renters(_data=None) -> None:
             }
     st.metric("Unique enquirers", len(renter_by_uid))
     if renter_by_uid:
-<<<<<<< HEAD
-        st.dataframe(pd.DataFrame(renter_by_uid.values()), width="stretch", hide_index=True)
-=======
         st.dataframe(pd.DataFrame(renter_by_uid.values()), use_container_width=True, hide_index=True)
->>>>>>> origin/development
+
+        st.dataframe(pd.DataFrame(renter_by_uid.values()), use_container_width=True, hide_index=True)
+
     else:
         st.info("Renter details will appear here when someone enquires about one of your published properties.")
 
 
-<<<<<<< HEAD
 def render_analytics(_data=None) -> None:
     st.title("Property Analytics")
-=======
 MODEL_FEATURES = (
     "city", "locality", "property_type", "furnishing_status", "area_sqft",
     "bedrooms", "bathrooms", "floor", "distance_to_city_center_km",
@@ -1147,12 +1032,11 @@ def render_analytics(data=None) -> None:
             }
         </style>
         """, unsafe_allow_html=True)
->>>>>>> origin/development
+
     records_data = load_or_report()
     if records_data is None:
         return
     listings = records_data["listings"]
-<<<<<<< HEAD
     details = [record.get("data") or {} for record in listings]
     published = [item for item in details if item.get("status") == "published"]
     occupied = sum(item.get("occupancy_status") == "occupied" for item in details)
@@ -1179,7 +1063,6 @@ def render_analytics(data=None) -> None:
         else:
             st.info("City breakdown will appear when you add a property.")
     st.caption("Metrics use your saved listing records. The dataset does not contain historical views, lease dates, or payment events.")
-=======
     if not listings:
         st.info("No saved properties yet. Add a property to see portfolio analytics and dataset comparisons.")
         if st.button("Add a property", type="primary", key="owner_analytics_add_property"):
@@ -1338,41 +1221,27 @@ def render_analytics(data=None) -> None:
                 "Type": item.get("property_type", ""), "Bedrooms": item.get("bedrooms", ""),
                 "Area (sq ft)": item.get("area_sqft", ""), "Dataset rent": money(item.get("rent")),
             } for item in similar]), width="stretch", hide_index=True)
->>>>>>> origin/development
+
 
 
 def render_revenue(_data=None) -> None:
     st.title("Revenue & Rent Collection")
-<<<<<<< HEAD
     st.caption("Listing rents provide an asking-rent estimate; completed payments are not yet recorded in RentAI.")
     try:
         listings = records("listing")
-=======
     st.caption("Confirm a tenancy explicitly, then record each rent period and mark it paid only after receipt.")
     try:
         listings = records("listing")
         enquiries = records("inquiry")
         tenancies = records("tenancy")
         payments = records("rent_payment")
->>>>>>> origin/development
+
     except ApplicationAPIError as exc:
         st.error(str(exc))
         return
     details = [record.get("data") or {} for record in listings]
     active = [item for item in details if item.get("status") == "published"]
     potential = sum(float(item.get("rent", 0) or 0) for item in active)
-<<<<<<< HEAD
-    a, b, c = st.columns(3)
-    a.metric("Potential monthly listed rent", money(potential))
-    b.metric("Rent collected", "Not tracked yet")
-    c.metric("Outstanding rent", "Not tracked yet")
-    st.subheader("Published rent schedule")
-    if active:
-        st.dataframe(pd.DataFrame([{"Property": item.get("title", "Property"), "City": item.get("city", ""), "Occupancy": item.get("occupancy_status", "Not tracked"), "Asking rent / month": item.get("rent", 0)} for item in active]), width="stretch", hide_index=True)
-    else:
-        st.info("Publish properties to see expected monthly asking rent.")
-    st.info("Payment receipts, due dates, collection status, income, and expenses are not stored by the current database. Collected and outstanding amounts are therefore not estimated.")
-=======
     collected = sum(float((item.get("data") or {}).get("paid_amount", 0) or 0) for item in payments if (item.get("data") or {}).get("status") == "paid")
     outstanding = sum(float((item.get("data") or {}).get("amount", 0) or 0) for item in payments if (item.get("data") or {}).get("status") == "pending")
     a, b, c = st.columns(3)
@@ -1511,7 +1380,7 @@ def render_revenue(_data=None) -> None:
         st.info("No rent due or payment records have been created yet.")
 
     st.caption("Income and expense accounting beyond recorded rent payments is not available yet. Payment records are entered by the Owner and are not independently verified by RentAI.")
->>>>>>> origin/development
+
 
 
 def render_maintenance(_data=None) -> None:
@@ -1552,11 +1421,11 @@ def render_maintenance(_data=None) -> None:
         "Reported by": "Renter" if (item.get("data") or {}).get("reported_by_role") == "renter" else "Owner",
         "Status": (item.get("data") or {}).get("status", "open"),
         "Due date": (item.get("data") or {}).get("due_date", "Not scheduled"),
-<<<<<<< HEAD
     } for item in requests]), width="stretch", hide_index=True)
-=======
     } for item in requests]), use_container_width=True, hide_index=True)
->>>>>>> origin/development
+
+    } for item in requests]), use_container_width=True, hide_index=True)
+
     selected = st.selectbox("Update request status", requests, format_func=lambda item: (item.get("data") or {}).get("title", "Maintenance request"), key="owner_maintenance_selector")
     current = selected.get("data") or {}
     with st.form("owner_update_maintenance"):
@@ -1573,36 +1442,6 @@ def render_maintenance(_data=None) -> None:
             st.error(str(exc))
 
 
-<<<<<<< HEAD
-def render_profile(_data=None) -> None:
-    st.title("My Profile")
-    st.caption("Update the contact details shown to renters who enquire about your listings.")
-    try:
-        profiles = records("profile")
-    except ApplicationAPIError as exc:
-        st.error(str(exc))
-        return
-    profile = next((item for item in profiles if (item.get("data") or {}).get("record_type") == "owner_profile"), None)
-    current = (profile or {}).get("data") or {}
-    with st.form("owner_profile_form"):
-        name = st.text_input("Full name", value=current.get("name") or owner_name())
-        email = st.text_input("Email", value=st.session_state.get("rentai_email", ""), disabled=True)
-        phone = st.text_input("Phone", value=current.get("phone", ""), max_chars=40)
-        business = st.text_input("Business or portfolio name", value=current.get("business_name", ""), max_chars=120)
-        bio = st.text_area("About you", value=current.get("bio", ""), max_chars=1000)
-        submitted = st.form_submit_button("Save profile", type="primary")
-    if submitted:
-        if not name.strip():
-            st.error("Your name is required.")
-            return
-        payload = {"record_type": "owner_profile", "name": name.strip(), "phone": phone.strip(), "business_name": business.strip(), "bio": bio.strip()}
-        try:
-            update(profile, payload) if profile else create("profile", payload)
-            st.success("Profile saved.")
-            st.rerun()
-        except ApplicationAPIError as exc:
-            st.error(str(exc))
-=======
 def _owner_profile_validation_errors(name: str, phone: str, business: str, bio: str) -> dict[str, str]:
     errors = {}
     if not name.strip():
@@ -1870,7 +1709,7 @@ def render_profile(_data=None) -> None:
     st.session_state[edit_key] = False
     st.session_state.pop(errors_key, None)
     st.rerun()
->>>>>>> origin/development
+
 
 
 def render_settings(_data=None) -> None:
@@ -1884,13 +1723,12 @@ def render_settings(_data=None) -> None:
     settings = next((item for item in profiles if (item.get("data") or {}).get("record_type") == "owner_settings"), None)
     current = (settings or {}).get("data") or {}
     with st.form("owner_settings_form"):
-<<<<<<< HEAD
-        email_alerts = st.toggle("Email me about new enquiries", value=current.get("email_alerts", True))
-        maintenance_alerts = st.toggle("Email me about maintenance status changes", value=current.get("maintenance_alerts", True))
-=======
         email_alerts = current.get("email_alerts", True)
         maintenance_alerts = current.get("maintenance_alerts", True)
->>>>>>> origin/development
+
+        email_alerts = current.get("email_alerts", True)
+        maintenance_alerts = current.get("maintenance_alerts", True)
+
         summary_frequency = st.selectbox("Portfolio summary", ["weekly", "monthly", "off"], index=["weekly", "monthly", "off"].index(current.get("summary_frequency", "weekly")) if current.get("summary_frequency", "weekly") in {"weekly", "monthly", "off"} else 0)
         submitted = st.form_submit_button("Save preferences", type="primary")
     if submitted:
@@ -1901,8 +1739,6 @@ def render_settings(_data=None) -> None:
             st.rerun()
         except ApplicationAPIError as exc:
             st.error(str(exc))
-<<<<<<< HEAD
-=======
 
 
 def render_booking_requests(_data=None) -> None:
@@ -1946,4 +1782,5 @@ def render_booking_requests(_data=None) -> None:
                             st.rerun()
                         except ApplicationAPIError as exc:
                             st.error(str(exc))
->>>>>>> origin/development
+
+

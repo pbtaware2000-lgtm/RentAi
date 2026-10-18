@@ -2,31 +2,6 @@
 
 from fastapi import HTTPException
 import math
-<<<<<<< HEAD
-from datetime import date, datetime, timezone
-
-from backend.auth.dependencies import CurrentUser
-from backend.core.auth import (
-    grant_role_to_user,
-    register_user_role as sqlite_register_user_role,
-)
-from backend.repositories.sqlite_repository import SQLiteRepository
-
-
-ROLE_OPERATIONS = {
-    "owner": {"listing": {"create", "read", "update", "delete"}, "profile": {"create", "read", "update", "delete"}, "inquiry": {"read", "update"}, "maintenance": {"create", "read", "update"}},
-    "renter": {"listing": {"read"}, "profile": {"create", "read", "update", "delete"}, "favorite": {"create", "read", "update", "delete"}, "inquiry": {"create", "read", "delete"}, "maintenance": {"create", "read", "delete"}},
-    "broker": {"profile": {"create", "read", "update", "delete"}, "listing": {"create", "read"}, "inquiry": {"read", "update"}},
-    "admin": {"*": {"create", "read", "update", "delete"}},
-}
-INQUIRY_TRANSITIONS = {
-    "new": {"contacted", "viewing_scheduled", "completed", "closed"},
-    "contacted": {"viewing_scheduled", "completed", "closed"},
-    "viewing_scheduled": {"contacted", "completed", "closed"},
-    "completed": set(),
-    "closed": set(),
-}
-=======
 import re
 from datetime import date, datetime, timezone
 import uuid
@@ -46,21 +21,14 @@ ROLE_OPERATIONS = {
     "broker": {"profile": {"create", "read", "update", "delete"}, "listing": {"read"}, "inquiry": {"read", "update"}},
     "admin": {"*": {"create", "read", "update", "delete"}},
 }
->>>>>>> origin/development
+
 
 
 class ApplicationService:
     def __init__(self, repository: SQLiteRepository | None = None):
         self.repository = repository or SQLiteRepository()
 
-<<<<<<< HEAD
-    def _log_activity(self, actor_uid, action, target_type, target_id, metadata=None):
-        log = getattr(self.repository, "add_activity", None)
-        if log:
-            log(actor_uid, action, target_type, target_id, metadata)
 
-=======
->>>>>>> origin/development
     def register_user_role(self, id_token: str, role: str) -> dict:
         uid = sqlite_register_user_role(id_token=id_token, role=role)
         return {"uid": uid, "role": role}
@@ -85,9 +53,6 @@ class ApplicationService:
         visible_listing_ids = {
             record.get("id") for record in self.list_records_for_user(user, "listing")
         }
-<<<<<<< HEAD
-        if not visible_listing_ids:
-=======
         return self._images_for_records(visible_listing_ids)
 
     def list_profile_images_for_user(self, user: CurrentUser) -> list[dict]:
@@ -100,16 +65,14 @@ class ApplicationService:
 
     def _images_for_records(self, record_ids: set[str]) -> list[dict]:
         if not record_ids:
->>>>>>> origin/development
+
             return []
         return [
             {key: image.get(key) for key in ("id", "record_id", "url", "format", "width", "height")}
             for image in self.repository.list_images()
-<<<<<<< HEAD
-            if image.get("record_id") in visible_listing_ids and isinstance(image.get("url"), str)
-=======
             if image.get("record_id") in record_ids and isinstance(image.get("url"), str)
->>>>>>> origin/development
+            if image.get("record_id") in record_ids and isinstance(image.get("url"), str)
+
         ]
 
     def list_users(self, actor: CurrentUser) -> list[dict]:
@@ -117,49 +80,13 @@ class ApplicationService:
             raise HTTPException(status_code=403, detail="Trusted Admin authorization is required")
         return self.repository.list_user_roles()
 
-<<<<<<< HEAD
-    def list_admin_records(self, actor: CurrentUser, kind: str | None = None) -> list[dict]:
-        if actor.role != "admin":
-            raise HTTPException(status_code=403, detail="Trusted Admin authorization is required")
-        return self.repository.list_admin_records(kind)
 
-    def set_account_status(self, actor: CurrentUser, uid: str, status: str) -> None:
-        if actor.role != "admin":
-            raise HTTPException(status_code=403, detail="Trusted Admin authorization is required")
-        target = self.repository.account_by_uid(uid)
-        if target and target.get("role") == "broker":
-            raise HTTPException(status_code=404, detail="Account not found")
-        try:
-            self.repository.set_account_status(actor.uid, uid, status)
-        except LookupError as exc:
-            raise HTTPException(status_code=404, detail=str(exc)) from exc
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-        self.repository.add_activity(actor.uid, "user_status_changed", "user", uid, {"status": status})
-
-    def review_property(self, actor: CurrentUser, property_id: str, status: str, notes: str = "") -> str:
-        if actor.role != "admin":
-            raise HTTPException(status_code=403, detail="Trusted Admin authorization is required")
-        try:
-            return self.repository.review_property(property_id, actor.uid, status, notes)
-        except LookupError as exc:
-            raise HTTPException(status_code=404, detail=str(exc)) from exc
-        except ValueError as exc:
-            raise HTTPException(status_code=409, detail=str(exc)) from exc
-
-=======
->>>>>>> origin/development
     def provision_user_role(
         self, actor: CurrentUser, actor_id_token: str, uid: str, role: str
     ) -> None:
         if actor.role != "admin":
             raise HTTPException(status_code=403, detail="Trusted Admin authorization is required")
-<<<<<<< HEAD
-        target = self.repository.account_by_uid(uid)
-        if target and target.get("role") == "broker":
-            raise HTTPException(status_code=404, detail="Account not found")
-=======
->>>>>>> origin/development
+
         grant_role_to_user(actor_id_token=actor_id_token, uid=uid, role=role)
 
     def create_record(self, user: CurrentUser, kind: str, data: dict) -> dict:
@@ -167,13 +94,6 @@ class ApplicationService:
         record_data = dict(data)
         if kind == "listing":
             record_data = self._validate_listing_data(record_data)
-<<<<<<< HEAD
-            # A request to publish a new property always enters the review queue.
-            if record_data["status"] == "published":
-                record_data["status"] = "pending"
-        if kind == "profile":
-            record_data = self._validate_profile_data(record_data)
-=======
         if kind == "profile":
             if record_data.get("record_type") == "owner_settings" and user.role != "owner":
                 raise HTTPException(status_code=403, detail="Only an Owner can save Owner notification preferences")
@@ -182,7 +102,7 @@ class ApplicationService:
             record_data = self._validate_tenancy_data(user, record_data)
         if kind == "rent_payment":
             record_data = self._validate_rent_payment_data(user, record_data)
->>>>>>> origin/development
+
         if kind == "inquiry":
             listing_id = record_data.get("listing_id")
             listing = self.repository.get("application_records", listing_id) if listing_id else None
@@ -191,21 +111,18 @@ class ApplicationService:
             if user.role == "renter" and (listing.get("data") or {}).get("status") != "published":
                 raise HTTPException(status_code=403, detail="Only published properties can receive enquiries")
             message = record_data.get("message", "")
-<<<<<<< HEAD
-            if not isinstance(message, str) or not message.strip() or len(message.strip()) > 2000:
-                raise HTTPException(status_code=400, detail="Inquiry message is required (2,000 characters maximum)")
-=======
             if not isinstance(message, str) or len(message.strip()) > 2000:
                 raise HTTPException(status_code=400, detail="Inquiry message must be 2,000 characters or fewer")
->>>>>>> origin/development
+
+            if not isinstance(message, str) or len(message.strip()) > 2000:
+                raise HTTPException(status_code=400, detail="Inquiry message must be 2,000 characters or fewer")
+
             client_name = record_data.get("client_name", "")
             phone = record_data.get("client_phone", "")
             if not isinstance(client_name, str) or not client_name.strip() or len(client_name.strip()) > 160:
                 raise HTTPException(status_code=400, detail="A client name is required")
             if not isinstance(phone, str) or len(phone.strip()) > 40:
                 raise HTTPException(status_code=400, detail="Client phone number is invalid")
-<<<<<<< HEAD
-=======
             if user.role == "renter":
                 list_records = getattr(self.repository, "list_records", None)
                 existing_records = list_records() if list_records else []
@@ -220,7 +137,7 @@ class ApplicationService:
                 if duplicate:
                     raise HTTPException(status_code=409, detail="You already have an active enquiry for this property.")
             listing_data = listing.get("data") or {}
->>>>>>> origin/development
+
             record_data = {
                 "listing_id": listing_id,
                 "message": message.strip(),
@@ -228,10 +145,6 @@ class ApplicationService:
                 "client_name": client_name.strip(),
                 "client_email": getattr(user, "claims", {}).get("email", ""),
                 "client_phone": phone.strip(),
-<<<<<<< HEAD
-                "status": "new",
-                "property_owner_uid": listing.get("owner_uid"),
-=======
                 "status": "pending",
                 "property_owner_uid": listing.get("owner_uid"),
                 "property": {
@@ -239,7 +152,7 @@ class ApplicationService:
                     for key in ("title", "locality", "city", "property_type", "rent")
                     if listing_data.get(key) is not None
                 },
->>>>>>> origin/development
+
                 "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             }
         if kind == "maintenance":
@@ -276,13 +189,14 @@ class ApplicationService:
             if isinstance(property_id, bool) or not isinstance(property_id, (str, int)) or not str(property_id).strip() or len(str(property_id)) > 160:
                 raise HTTPException(status_code=400, detail="Favorite must reference a property")
             property_id = str(property_id).strip()
-<<<<<<< HEAD
-            source = record_data.get("source", "catalog")
-=======
             # The source is required so legacy or malformed clients cannot silently
             # turn an ambiguous property reference into a dataset bookmark.
             source = record_data.get("source")
->>>>>>> origin/development
+
+            # The source is required so legacy or malformed clients cannot silently
+            # turn an ambiguous property reference into a dataset bookmark.
+            source = record_data.get("source")
+
             if source == "catalog":
                 from backend.services.property_service import get_property_by_id
 
@@ -304,32 +218,15 @@ class ApplicationService:
                 "id", "property_id", "title", "city", "locality", "property_type", "rent",
                 "bedrooms", "bathrooms", "area_sqft", "furnishing_status", "parking",
                 "security_deposit", "maintenance", "available_from", "posted_date", "image_url",
-<<<<<<< HEAD
-                "image", "photo_url", "description", "status",
-=======
                 "image", "photo_url", "image_path", "description", "status",
->>>>>>> origin/development
+
+                "image", "photo_url", "image_path", "description", "status",
+
             }
             snapshot = {key: value for key, value in prop.items() if key in allowed_fields}
             record_data = {"property_id": property_id, "source": source, "property": snapshot}
         record = {"owner_uid": user.uid, "kind": kind, "data": data}
         record["data"] = record_data
-<<<<<<< HEAD
-        if kind == "listing" and record_data.get("status") == "pending":
-            create_pending = getattr(self.repository, "create_listing_with_approval", None)
-            if create_pending:
-                record_id, approval_id = create_pending(record)
-                self._log_activity(user.uid, "property_submitted", "property", record_id, {"approval_request_id": approval_id})
-            else:
-                record_id, _ = self.repository.create("application_records", record)
-                create_approval = getattr(self.repository, "create_approval_request", None)
-                if create_approval:
-                    create_approval(record_id, user.uid)
-        else:
-            record_id, _ = self.repository.create("application_records", record)
-        if kind == "inquiry":
-            self._log_activity(user.uid, "rental_request_submitted", "rental_request", record_id, {"listing_id": record_data.get("listing_id")})
-=======
         notification = None
         if kind == "inquiry":
             owner_uid = record_data.get("property_owner_uid")
@@ -352,7 +249,7 @@ class ApplicationService:
             else:
                 message = "This accepted enquiry already has an active tenancy" if kind == "tenancy" else "A rent record already exists for this tenancy and period"
             raise HTTPException(status_code=409, detail=message) from None
->>>>>>> origin/development
+
         return {"id": record_id, **record}
 
     def get_record(self, user: CurrentUser, record_id: str) -> dict:
@@ -368,27 +265,6 @@ class ApplicationService:
             raise HTTPException(status_code=404, detail="Record not found")
         self._authorize_record_access(user, record, "update")
         safe_data = dict(data)
-<<<<<<< HEAD
-        if record.get("kind") == "listing":
-            safe_data = self._validate_listing_data({**(record.get("data") or {}), **safe_data})
-            if user.role != "admin":
-                prior_status = (record.get("data") or {}).get("status", "draft")
-                if safe_data.get("status") != prior_status:
-                    safe_data["status"] = prior_status
-        elif record.get("kind") == "profile":
-            safe_data = self._validate_profile_data(safe_data)
-        elif record.get("kind") == "inquiry" and user.role in {"broker", "owner"}:
-            status = safe_data.get("status")
-            note = safe_data.get("owner_note" if user.role == "owner" else "broker_note", "")
-            current_status = (record.get("data") or {}).get("status", "new")
-            if status not in INQUIRY_TRANSITIONS or (status != current_status and status not in INQUIRY_TRANSITIONS.get(current_status, set())):
-                raise HTTPException(status_code=400, detail="Unsupported enquiry status")
-            if not isinstance(note, str) or len(note) > 2000:
-                raise HTTPException(status_code=400, detail="Request note must be 2,000 characters or fewer")
-            note_field = "owner_note" if user.role == "owner" else "broker_note"
-            safe_data = {**(record.get("data") or {}), "status": status, note_field: note.strip()}
-        elif record.get("kind") == "maintenance" and user.role == "owner":
-=======
         if record.get("kind") == "profile" and (
             (record.get("data") or {}).get("record_type") == "owner_settings"
             or safe_data.get("record_type") == "owner_settings"
@@ -427,22 +303,13 @@ class ApplicationService:
             safe_data = {**(record.get("data") or {}), "status": status, "broker_note": note.strip()}
         elif record.get("kind") == "maintenance" and user.role == "owner":
             old_data = record.get("data") or {}
->>>>>>> origin/development
+
             status = safe_data.get("status")
             note = safe_data.get("owner_note", "")
             if status not in {"open", "in_progress", "completed", "cancelled"}:
                 raise HTTPException(status_code=400, detail="Unsupported maintenance status")
             if not isinstance(note, str) or len(note) > 2000:
                 raise HTTPException(status_code=400, detail="Maintenance note must be 2,000 characters or fewer")
-<<<<<<< HEAD
-            safe_data = {**(record.get("data") or {}), "status": status, "owner_note": note.strip()}
-        if not self.repository.update("application_records", record_id, {"data": safe_data}):
-            raise HTTPException(status_code=404, detail="Record not found")
-        if record.get("kind") == "listing":
-            self._log_activity(user.uid, "property_updated", "property", record_id)
-        elif record.get("kind") == "inquiry" and safe_data.get("status") != (record.get("data") or {}).get("status"):
-            self._log_activity(user.uid, "rental_request_status_changed", "rental_request", record_id, {"status": safe_data.get("status")})
-=======
             safe_data = {**old_data, "status": status, "owner_note": note.strip()}
             previous_status = old_data.get("status", "open")
             listing = self.repository.get("application_records", old_data.get("listing_id"))
@@ -515,7 +382,7 @@ class ApplicationService:
                 return updated_record
         if not self.repository.update("application_records", record_id, {"data": safe_data}):
             raise HTTPException(status_code=404, detail="Record not found")
->>>>>>> origin/development
+
         return {**record, "data": safe_data}
 
     def delete_record(self, user: CurrentUser, record_id: str) -> None:
@@ -523,11 +390,6 @@ class ApplicationService:
         if record is None:
             raise HTTPException(status_code=404, detail="Record not found")
         self._authorize_record_access(user, record, "delete")
-<<<<<<< HEAD
-        if not self.repository.delete("application_records", record_id):
-            raise HTTPException(status_code=404, detail="Record not found")
-        self._log_activity(user.uid, f"{record.get('kind')}_deleted", record.get("kind", "record"), record_id)
-=======
         if record.get("kind") == "listing":
             from backend.repositories.sqlite_repository import connect
             with connect() as db:
@@ -581,7 +443,7 @@ class ApplicationService:
         if record is None:
             raise HTTPException(status_code=404, detail="Record not found")
         return {**record, "assigned_broker_uids": updated}
->>>>>>> origin/development
+
 
     @staticmethod
     def _validate_listing_data(data: dict) -> dict:
@@ -595,13 +457,12 @@ class ApplicationService:
         if isinstance(bedrooms, bool) or not isinstance(bedrooms, int) or not 1 <= bedrooms <= 30:
             raise HTTPException(status_code=400, detail="Bedrooms must be between 1 and 30")
         status = data.get("status", "draft")
-<<<<<<< HEAD
-        if status not in {"draft", "pending", "published", "rejected", "inactive"}:
-            raise HTTPException(status_code=400, detail="Listing status is invalid")
-=======
         if status not in {"draft", "published", "unlisted"}:
             raise HTTPException(status_code=400, detail="Listing status must be draft, published, or unlisted")
->>>>>>> origin/development
+
+        if status not in {"draft", "published", "unlisted"}:
+            raise HTTPException(status_code=400, detail="Listing status must be draft, published, or unlisted")
+
         description = data.get("description", "")
         if not isinstance(description, str) or len(description) > 5000:
             raise HTTPException(status_code=400, detail="Listing description must be 5,000 characters or fewer")
@@ -616,28 +477,6 @@ class ApplicationService:
             "rent": float(rent), "bedrooms": bedrooms, "property_type": property_type.strip(),
             "description": description.strip(), "status": status,
             "occupancy_status": occupancy_status,
-<<<<<<< HEAD
-        }
-        for field, maximum in (("bathrooms", 30), ("floor", 300), ("parking", 100)):
-            value = data.get(field)
-            if value is not None:
-                if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= maximum:
-                    raise HTTPException(status_code=400, detail=f"{field.replace('_', ' ').title()} is invalid")
-                result[field] = value
-        area = data.get("area_sqft")
-        if area is not None:
-            if isinstance(area, bool) or not isinstance(area, (int, float)) or not math.isfinite(float(area)) or area < 0:
-                raise HTTPException(status_code=400, detail="Area must be a non-negative number")
-            if area > 0:
-                result["area_sqft"] = float(area)
-        for field, maximum in (("furnishing_status", 80),):
-            value = data.get(field)
-            if value is not None:
-                if not isinstance(value, str) or len(value.strip()) > maximum:
-                    raise HTTPException(status_code=400, detail=f"{field.replace('_', ' ').title()} is invalid")
-                result[field] = value.strip()
-        return result
-=======
           }
         validated = {
             "title": title.strip(), "city": city.strip(), "locality": locality.strip(),
@@ -681,7 +520,7 @@ class ApplicationService:
                 raise HTTPException(status_code=400, detail="Furnishing status is invalid")
             validated["furnishing_status"] = furnishing.strip()
         return validated
->>>>>>> origin/development
+
 
     @staticmethod
     def _validate_profile_data(data: dict) -> dict:
@@ -710,17 +549,6 @@ class ApplicationService:
                 raise HTTPException(status_code=400, detail="Profile phone number is invalid")
             if not isinstance(preferred_city, str) or len(preferred_city) > 120:
                 raise HTTPException(status_code=400, detail="Preferred city is too long")
-<<<<<<< HEAD
-            return {"record_type": record_type, "name": name.strip(), "phone": phone.strip(), "preferred_city": preferred_city.strip()}
-        if record_type == "renter_settings":
-            sort_by = data.get("sort_by", "rent")
-            sort_order = data.get("sort_order", "asc")
-            if sort_by not in {"rent", "area_sqft", "bedrooms"}:
-                raise HTTPException(status_code=400, detail="Unsupported default property sort")
-            if sort_order not in {"asc", "desc"}:
-                raise HTTPException(status_code=400, detail="Unsupported sort order")
-            return {"record_type": record_type, "sort_by": sort_by, "sort_order": sort_order}
-=======
             property_type = data.get("preferred_property_type", "Any")
             furnishing = data.get("furnishing_preference", "Any")
             preferred_bhk = data.get("preferred_bhk", "Any")
@@ -740,7 +568,7 @@ class ApplicationService:
             return {"record_type": record_type, "name": name.strip(), "phone": phone.strip(), "preferred_city": preferred_city.strip(),
                     "preferred_property_type": property_type, "monthly_budget_min": budget_min, "monthly_budget_max": budget_max,
                     "preferred_bhk": preferred_bhk, "furnishing_preference": furnishing}
->>>>>>> origin/development
+
         if record_type == "owner_settings":
             email_alerts = data.get("email_alerts", True)
             maintenance_alerts = data.get("maintenance_alerts", True)
@@ -754,11 +582,10 @@ class ApplicationService:
 
     @staticmethod
     def _authorize_kind_operation(user: CurrentUser, kind: str, operation: str) -> None:
-<<<<<<< HEAD
-        if kind not in {"listing", "profile", "favorite", "inquiry", "maintenance"}:
-=======
         if kind not in {"listing", "profile", "favorite", "inquiry", "maintenance", "tenancy", "rent_payment"}:
->>>>>>> origin/development
+
+        if kind not in {"listing", "profile", "favorite", "inquiry", "maintenance", "tenancy", "rent_payment"}:
+
             raise HTTPException(status_code=400, detail="Unsupported application record kind")
         if user.role == "admin":
             return
@@ -766,26 +593,6 @@ class ApplicationService:
         if operation not in operations:
             raise HTTPException(status_code=403, detail="Role cannot perform this operation on this record kind")
 
-<<<<<<< HEAD
-    def _authorize_record_access(self, user: CurrentUser, record: dict, operation: str) -> None:
-        if user.role == "admin":
-            return
-        kind = record.get("kind")
-        self._authorize_kind_operation(user, kind, operation)
-        data = record.get("data") or {}
-        assigned = user.uid in record.get("assigned_broker_uids", [])
-        if user.role == "broker" and kind in {"listing", "inquiry"}:
-            owns_record = record.get("owner_uid") == user.uid
-            if kind == "listing" and operation == "read" and owns_record:
-                return
-            if kind == "inquiry" and not assigned:
-                listing_id = (record.get("data") or {}).get("listing_id")
-                listing = self.repository.get("application_records", listing_id) if listing_id else None
-                assigned = bool(listing and (
-                    listing.get("owner_uid") == user.uid
-                    or user.uid in listing.get("assigned_broker_uids", [])
-                ))
-=======
     @classmethod
     def _authorize_record_access(cls, user: CurrentUser, record: dict, operation: str) -> None:
         if user.role == "admin":
@@ -795,7 +602,7 @@ class ApplicationService:
         data = record.get("data") or {}
         assigned = user.uid in record.get("assigned_broker_uids", [])
         if user.role == "broker" and kind in {"listing", "inquiry"}:
->>>>>>> origin/development
+
             if operation not in ({"read", "update"} if kind == "inquiry" else {"read"}) or not assigned:
                 raise HTTPException(status_code=403, detail="Broker is not assigned to this record")
             return
@@ -803,20 +610,16 @@ class ApplicationService:
             if operation == "read" and data.get("status") == "published":
                 return
             raise HTTPException(status_code=403, detail="Only published listings are visible to renters")
-<<<<<<< HEAD
-=======
         if user.role == "renter" and kind == "rent_payment":
             if operation == "read" and data.get("renter_uid") == user.uid:
                 return
             raise HTTPException(status_code=403, detail="Rent record belongs to another Renter")
->>>>>>> origin/development
+
         owns_record = record.get("owner_uid") == user.uid
         if kind in {"inquiry", "maintenance"} and user.role == "owner":
             owns_record = data.get("property_owner_uid") == user.uid
         if not owns_record:
             raise HTTPException(status_code=403, detail="Record belongs to another user")
-<<<<<<< HEAD
-=======
 
     def _validate_tenancy_data(self, user: CurrentUser, data: dict) -> dict:
         if user.role != "owner":
@@ -895,4 +698,4 @@ class ApplicationService:
             "amount": tenancy_data["monthly_rent"], "due_date": due_date.isoformat(),
             "status": "pending", "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         }
->>>>>>> origin/development
+

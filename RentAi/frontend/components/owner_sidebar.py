@@ -13,18 +13,11 @@ OWNER_MENU = (
     ("Revenue & Rent Collection", "₹"),
     ("Maintenance Requests", "⚒"),
     ("My Profile", "◉"),
-<<<<<<< HEAD
-    ("Settings", "⚙"),
-    ("App Reviews", "★"),
-    ("Support & Complaints", "?"),
-)
-
-=======
 )
 
 OWNER_MENU = (*OWNER_MENU, ("Booking Requests", "▣"))
 
->>>>>>> origin/development
+
 
 def _select_owner_page(page: str) -> None:
     st.session_state.owner_active_page = page

@@ -38,8 +38,6 @@ class MemoryRepository:
     def get_user_role(self, uid):
         return self.records.get(f"role:{uid}")
 
-<<<<<<< HEAD
-=======
     def assign_broker(self, record_id, broker_uid):
         record = self.records.get(record_id)
         if record is None:
@@ -47,7 +45,7 @@ class MemoryRepository:
         record["assigned_broker_uids"] = sorted(set(record.get("assigned_broker_uids", [])) | {broker_uid})
         return record["assigned_broker_uids"]
 
->>>>>>> origin/development
+
 
 class ApplicationAuthTests(unittest.TestCase):
     @patch("backend.repositories.firestore_repository.FirestoreRepository.create_user_role", return_value=True)
@@ -204,8 +202,6 @@ class ApplicationAuthTests(unittest.TestCase):
             })
         self.assertEqual(caught.exception.status_code, 403)
 
-<<<<<<< HEAD
-=======
     @patch("backend.services.application_service.get_trusted_user_role", return_value="broker")
     def test_only_admin_can_assign_verified_broker(self, get_role):
         repository = MemoryRepository({
@@ -232,7 +228,7 @@ class ApplicationAuthTests(unittest.TestCase):
             service.assign_broker(owner, "listing", "broker-1")
         self.assertEqual(caught.exception.status_code, 403)
 
->>>>>>> origin/development
+
     @patch("backend.core.firebase.verify_id_token", return_value={"uid": "operator-1", "role": "admin"})
     @patch("backend.core.firebase.get_firebase_app", return_value=object())
     @patch("backend.repositories.firestore_repository.FirestoreRepository")

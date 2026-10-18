@@ -6,26 +6,24 @@ from backend.core.config import startup_configuration_issues
 from frontend.components.sidebar import render_sidebar
 from frontend.components.owner_sidebar import render_owner_sidebar
 from frontend.components.renter_sidebar import render_renter_sidebar
-<<<<<<< HEAD
-=======
 from frontend.components.chatbot import render as render_chatbot
->>>>>>> origin/development
+
+from frontend.components.chatbot import render as render_chatbot
 from frontend.authentication import (
     AuthenticationError,
     accessible_pages,
     clear_auth_session,
     current_session_user,
-<<<<<<< HEAD
     logout_session,
 )
 from frontend.data_loader import load_dataset
 from frontend.pages import admin_reports, algo_lab, analytics, clustering, eda, home, implementation, insights, learning, property_comparison, property_search, rent_classification, rent_prediction
 from frontend.pages import app_reviews
-=======
+
 )
 from frontend.data_loader import load_dataset
 from frontend.pages import admin_reports, algo_lab, analytics, clustering, eda, home, implementation, insights, learning, property_comparison, property_search, rent_classification, rent_prediction
->>>>>>> origin/development
+
 from frontend.pages.login import render as render_login
 from frontend.pages.register import render as render_register
 from frontend.pages.role_landing import PUBLIC_ROLES, render as render_role_landing
@@ -46,7 +44,6 @@ PAGE_RENDERERS = {
     "Property Insights": insights.render,
     "Algo Lab": algo_lab.render,
     "Admin & Reports": admin_reports.render,
-<<<<<<< HEAD
     "User Management": admin_reports.render,
     "Property Approval Requests": admin_reports.render,
     "Booking & Rental Requests": admin_reports.render,
@@ -58,8 +55,7 @@ PAGE_RENDERERS = {
     "My Broker Listings": owner_sections.render_broker_listings,
     "Support & Complaints": admin_reports.render_support_page,
     "Add New Property": owner_sections.render_add_property,
-=======
->>>>>>> origin/development
+
 }
 
 DASHBOARD_RENDERERS = {
@@ -74,21 +70,18 @@ OWNER_SECTION_RENDERERS = {
     "My Properties": owner_sections.render_properties,
     "Add New Property": owner_sections.render_add_property,
     "Applications & Enquiries": owner_sections.render_enquiries,
-<<<<<<< HEAD
-=======
     "Booking Requests": owner_sections.render_booking_requests,
->>>>>>> origin/development
+
+    "Booking Requests": owner_sections.render_booking_requests,
+
     "Renter List": owner_sections.render_renters,
     "Property Analytics": owner_sections.render_analytics,
     "Revenue & Rent Collection": owner_sections.render_revenue,
     "Maintenance Requests": owner_sections.render_maintenance,
     "My Profile": owner_sections.render_profile,
-<<<<<<< HEAD
     "Settings": owner_sections.render_settings,
     "App Reviews": app_reviews.render,
     "Support & Complaints": admin_reports.render_user_support,
-=======
->>>>>>> origin/development
 }
 
 RENTER_SECTION_RENDERERS = {
@@ -98,16 +91,13 @@ RENTER_SECTION_RENDERERS = {
     "Compare Properties": renter_workspace.render_compare,
     "Saved Properties": renter_workspace.render_saved,
     "My Enquiries": renter_workspace.render_enquiries,
-<<<<<<< HEAD
     "My Profile": renter_workspace.render_profile,
     "Settings": renter_workspace.render_settings,
     "App Reviews": app_reviews.render,
     "Support & Complaints": admin_reports.render_user_support,
-=======
     "My Bookings": renter_workspace.render_bookings,
     "Pay Rent": renter_workspace.render_rent_payments,
     "My Profile": renter_workspace.render_profile,
->>>>>>> origin/development
 }
 
 
@@ -120,14 +110,12 @@ st.set_page_config(
     page_title="RentAI | Rental Intelligence",
     page_icon="🏠",
     layout="wide",
-<<<<<<< HEAD
     # Keep navigation open across reruns and client refreshes. The prior
     # expanded setting was only an initial preference, so a collapsed client
     # state could leave authenticated pages with a blank left gutter.
     initial_sidebar_state="locked",
-=======
     initial_sidebar_state="expanded",
->>>>>>> origin/development
+    initial_sidebar_state="expanded",
 )
 
 configuration_issues = startup_configuration_issues()
@@ -164,13 +152,11 @@ else:
     if st.session_state.pop("rentai_registration_success", False):
         st.success("Your RentAI account is ready.")
     allowed_pages = accessible_pages(role, [*PAGE_RENDERERS, *DASHBOARD_RENDERERS])
-<<<<<<< HEAD
     if role == "admin":
         allowed_pages = [page for page in allowed_pages if page not in {
             "Broker Dashboard", "My Broker Listings",
         }]
-=======
->>>>>>> origin/development
+
     if role == "renter":
         # These tools now live inside the persistent Renter workspace sidebar.
         # Keep the standalone routes from replacing that dedicated navigation.
@@ -185,21 +171,19 @@ else:
     data = load_dataset()
     if role == "owner" and st.session_state.page == "Owner Dashboard":
         render_owner_sidebar(
-<<<<<<< HEAD
-            on_logout=lambda: logout_session(st.session_state)
-=======
             on_logout=lambda: clear_auth_session(st.session_state, clear_login_inputs=True)
->>>>>>> origin/development
+
+            on_logout=lambda: clear_auth_session(st.session_state, clear_login_inputs=True)
+
         )
         selected_owner_page = st.session_state.get("owner_active_page", "Dashboard")
         OWNER_SECTION_RENDERERS.get(selected_owner_page, owner_dashboard.render)(data)
     elif role == "renter" and st.session_state.page == "Renter Dashboard":
         render_renter_sidebar(
-<<<<<<< HEAD
             on_logout=lambda: logout_session(st.session_state)
-=======
             on_logout=lambda: clear_auth_session(st.session_state, clear_login_inputs=True)
->>>>>>> origin/development
+            on_logout=lambda: clear_auth_session(st.session_state, clear_login_inputs=True)
+
         )
         selected_renter_page = st.session_state.get("renter_active_page", "Dashboard")
         RENTER_SECTION_RENDERERS.get(selected_renter_page, renter_dashboard.render)(data)
@@ -207,14 +191,7 @@ else:
         render_sidebar(
             data,
             role=role,
-            allowed_pages=allowed_pages,
-<<<<<<< HEAD
-            on_logout=lambda: logout_session(st.session_state),
-        )
-        renderer = PAGE_RENDERERS.get(st.session_state.page) or DASHBOARD_RENDERERS[st.session_state.page]
-        renderer(data)
-=======
-            on_logout=lambda: clear_auth_session(st.session_state, clear_login_inputs=True),
+            allowed_pages=allowed_pages,            on_logout=lambda: clear_auth_session(st.session_state, clear_login_inputs=True),
         )
         renderer = PAGE_RENDERERS.get(st.session_state.page) or DASHBOARD_RENDERERS[st.session_state.page]
         renderer(data)
@@ -224,4 +201,4 @@ else:
     elif st.session_state.page == "Renter Dashboard":
         active_chat_page = st.session_state.get("renter_active_page", "Dashboard")
     render_chatbot(role, signed_in_user["uid"], active_chat_page)
->>>>>>> origin/development
+

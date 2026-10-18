@@ -5,14 +5,6 @@ from html import escape
 import math
 
 import pandas as pd
-<<<<<<< HEAD
-import streamlit as st
-
-from frontend.pages.owner_support import load_or_report, money, owner_name
-
-
-def calculate_metrics(listings: list[dict], enquiries: list[dict], maintenance: list[dict]) -> dict:
-=======
 import plotly.express as px
 import streamlit as st
 
@@ -21,24 +13,18 @@ from frontend.application_api import ApplicationAPIError, bookings as booking_re
 
 
 def calculate_metrics(listings: list[dict], enquiries: list[dict], maintenance: list[dict], rent_payments: list[dict] | None = None) -> dict:
->>>>>>> origin/development
+
     """Calculate dashboard values from API-authorized records only."""
     details = [record.get("data") or {} for record in listings]
     published = [item for item in details if item.get("status") == "published"]
     drafts = [item for item in details if item.get("status") == "draft"]
-<<<<<<< HEAD
-    occupied = sum(item.get("occupancy_status") == "occupied" for item in details)
-    vacant = sum(item.get("occupancy_status") == "vacant" for item in details)
-    unknown = len(details) - occupied - vacant
-    new_enquiries = sum((record.get("data") or {}).get("status", "new") == "new" for record in enquiries)
-=======
     unlisted = [item for item in details if item.get("status") == "unlisted"]
     occupied = sum(item.get("occupancy_status") == "occupied" for item in details)
     vacant = sum(item.get("occupancy_status") == "vacant" for item in details)
     unknown = len(details) - occupied - vacant
     pending_statuses = {"new", "pending", "contacted", "viewing_scheduled"}
     new_enquiries = sum((record.get("data") or {}).get("status", "new") in pending_statuses for record in enquiries)
->>>>>>> origin/development
+
     rent = 0.0
     for item in published:
         try:
@@ -47,15 +33,6 @@ def calculate_metrics(listings: list[dict], enquiries: list[dict], maintenance: 
                 rent += amount
         except (TypeError, ValueError):
             continue
-<<<<<<< HEAD
-    return {
-        "details": details, "published": published, "drafts": drafts,
-        "occupied": occupied, "vacant": vacant, "occupancy_unknown": unknown,
-        "new_enquiries": new_enquiries, "potential_monthly_rent": rent,
-    }
-
-
-=======
     payments = rent_payments or []
     collected = 0.0
     outstanding = 0.0
@@ -273,7 +250,6 @@ def _render_count_chart(series: pd.Series, category_label: str, key: str, color:
     st.plotly_chart(figure, width="stretch", key=key, config={"displayModeBar": False})
 
 
->>>>>>> origin/development
 def _metric_card(column, label: str, value: str | int, hint: str, accent: str) -> None:
     with column, st.container(border=True):
         st.markdown(
@@ -287,18 +263,12 @@ def _metric_card(column, label: str, value: str | int, hint: str, accent: str) -
 def render(_data=None) -> None:
     st.markdown("""
     <style>
-<<<<<<< HEAD
-      [data-testid='stMetric'] { padding: .15rem .1rem; }
-=======
->>>>>>> origin/development
+
+
       .owner-hero { background:linear-gradient(115deg,#07101f 0%,#132c48 70%,#17415e 100%);
         border-radius:18px; padding:1.5rem 1.8rem; margin:.25rem 0 1.25rem; color:#f8fafc; }
       .owner-hero h1 { color:#fff!important; font-size:1.8rem!important; margin:0 0 .35rem; }
       .owner-hero p { color:#cbd5e1!important; margin:0; }
-<<<<<<< HEAD
-      .owner-kpi-accent { height:4px; border-radius:4px; margin:0 0 .65rem; }
-      div[data-testid='stVerticalBlockBorderWrapper'] { border-radius:14px; border-color:#e2e8f0; }
-=======
       .owner-kpi-accent { height:3px; width:100%; border-radius:999px; margin:0 0 .45rem; }
       div[data-testid='stVerticalBlockBorderWrapper'] { border-radius:14px; border-color:#e2e8f0; }
       div[data-testid='stVerticalBlockBorderWrapper']:has(.owner-kpi-accent) { height:100%; }
@@ -317,25 +287,24 @@ def render(_data=None) -> None:
       div[data-testid='stVerticalBlockBorderWrapper']:has(.owner-kpi-accent) [data-testid='stCaptionContainer'] {
         min-height:2.6em; color:#64748b; font-size:.76rem; line-height:1.3; text-align:left;
       }
->>>>>>> origin/development
+
       .owner-section-note { color:#64748b; font-size:.88rem; }
     </style>
     """, unsafe_allow_html=True)
     records = load_or_report()
     if records is None:
-<<<<<<< HEAD
-=======
         render_dataset_analytics(_data)
->>>>>>> origin/development
+
+        render_dataset_analytics(_data)
+
         return
     listings = records["listings"]
     enquiries = records["enquiries"]
     maintenance = records["maintenance"]
-<<<<<<< HEAD
-    metrics = calculate_metrics(listings, enquiries, maintenance)
-=======
     metrics = calculate_metrics(listings, enquiries, maintenance, records.get("rent_payments", []))
->>>>>>> origin/development
+
+    metrics = calculate_metrics(listings, enquiries, maintenance, records.get("rent_payments", []))
+
     details = metrics["details"]
     published = metrics["published"]
 
@@ -344,17 +313,6 @@ def render(_data=None) -> None:
         "<p>Your rental portfolio at a glance, with listings and activity from your account.</p></div>",
         unsafe_allow_html=True,
     )
-<<<<<<< HEAD
-    kpis = st.columns(4)
-    _metric_card(kpis[0], "Total properties", len(listings), "Your saved portfolio", "#ff6b1a")
-    _metric_card(kpis[1], "Published", len(published), "Visible rental listings", "#059669")
-    _metric_card(kpis[2], "Vacant", metrics["vacant"], f"{metrics['occupancy_unknown']} without occupancy status", "#60a5fa")
-    _metric_card(kpis[3], "Occupied", metrics["occupied"], f"{len(metrics['drafts'])} draft or unlisted", "#8b5cf6")
-
-    st.subheader("Portfolio activity")
-    activity = st.columns(3)
-    _metric_card(activity[0], "New enquiries", metrics["new_enquiries"], f"of {len(enquiries)} total messages", "#ff6b1a")
-=======
     actions = st.columns(3)
     if actions[0].button("Add a property", type="primary", key="owner_dashboard_add_property"):
         st.session_state.owner_active_page = "Add New Property"
@@ -376,17 +334,12 @@ def render(_data=None) -> None:
     st.subheader("Portfolio activity")
     activity = st.columns(3)
     _metric_card(activity[0], "Pending enquiries", metrics["new_enquiries"], f"of {len(enquiries)} total messages", "#ff6b1a")
->>>>>>> origin/development
+
     _metric_card(activity[1], "Enquiry messages", len(enquiries), "Renter enquiries for your properties", "#60a5fa")
     _metric_card(activity[2], "Maintenance requests", len(maintenance), "Open and recorded work items", "#8b5cf6")
 
     st.subheader("Revenue overview")
     revenue = st.columns(4)
-<<<<<<< HEAD
-    _metric_card(revenue[0], "Potential monthly rent", money(metrics["potential_monthly_rent"]), "Published asking rents only", "#059669")
-    for column, title in zip(revenue[1:], ("Rent collected", "Outstanding rent", "Income & expenses")):
-        _metric_card(column, title, "Not tracked", "Payment and expense records are not stored", "#94a3b8")
-=======
     try:
         bookings = booking_records()
         verified_amount = sum(int(item.get("amount_due", 0)) for item in bookings if item.get("payment_status") == "paid") / 100
@@ -403,7 +356,7 @@ def render(_data=None) -> None:
     _metric_card(revenue[2], "Outstanding rent", money(metrics["rent_outstanding"]), "Pending rent records in your portfolio", "#f59e0b")
 
     render_dataset_analytics(_data)
->>>>>>> origin/development
+
 
     st.subheader("Portfolio overview")
     chart_col, table_col = st.columns([1, 1.2])
@@ -411,12 +364,6 @@ def render(_data=None) -> None:
         st.markdown("**Monthly asking rent**")
         if published:
             chart = pd.DataFrame({
-<<<<<<< HEAD
-                "Property": [str(item.get("title") or item.get("locality") or "Listing")[:24] for item in published],
-                "Monthly rent": [float(item.get("rent", 0) or 0) for item in published],
-            }).set_index("Property")
-            st.bar_chart(chart, height=260, color="#ff6b1a")
-=======
                 "Property": [str(item.get("title") or item.get("locality") or "Listing") for item in published],
                 "Monthly rent": [float(item.get("rent", 0) or 0) for item in published],
             })
@@ -444,7 +391,7 @@ def render(_data=None) -> None:
                 gridcolor="#ffffff", zerolinecolor="#ffffff",
             )
             st.plotly_chart(rent_chart, width="stretch", key="owner-portfolio-asking-rent", config={"displayModeBar": False})
->>>>>>> origin/development
+
         else:
             st.info("No published listings yet. Add a property and publish it to see potential rent here.")
     with table_col, st.container(border=True):
@@ -456,11 +403,10 @@ def render(_data=None) -> None:
                 "Status": "Listed" if item.get("status") == "published" else "Draft",
                 "Occupancy": {"occupied": "Occupied", "vacant": "Vacant"}.get(item.get("occupancy_status"), "Not tracked"),
                 "Monthly rent": money(item.get("rent")),
-<<<<<<< HEAD
-            } for item in details]), width="stretch", hide_index=True)
-=======
             } for item in details]), use_container_width=True, hide_index=True)
->>>>>>> origin/development
+
+            } for item in details]), use_container_width=True, hide_index=True)
+
         else:
             st.info("Your portfolio is empty. Add your first property to start tracking listings and enquiries.")
 
@@ -471,12 +417,6 @@ def render(_data=None) -> None:
             "Renter": (item.get("data") or {}).get("client_name", "Renter"),
             "Property ID": (item.get("data") or {}).get("listing_id", ""),
             "Status": (item.get("data") or {}).get("status", "new").replace("_", " ").title(),
-<<<<<<< HEAD
-        } for item in recent]), width="stretch", hide_index=True)
-    else:
-        st.info("Enquiries about your listings will appear here.")
-
-=======
         } for item in recent]), use_container_width=True, hide_index=True)
     else:
         st.info("Enquiries about your listings will appear here.")
@@ -495,15 +435,14 @@ def render(_data=None) -> None:
     else:
         st.info("Add a property to see your recent portfolio activity.")
 
->>>>>>> origin/development
+
     st.subheader("Upcoming activities")
     dated = [item.get("data") or {} for item in maintenance
              if (item.get("data") or {}).get("due_date", "") >= date.today().isoformat()]
     if dated:
-<<<<<<< HEAD
-        st.dataframe(pd.DataFrame(dated), width="stretch", hide_index=True)
-=======
         st.dataframe(pd.DataFrame(dated), use_container_width=True, hide_index=True)
->>>>>>> origin/development
+
+        st.dataframe(pd.DataFrame(dated), use_container_width=True, hide_index=True)
+
     else:
         st.caption("No upcoming maintenance dates are recorded.")

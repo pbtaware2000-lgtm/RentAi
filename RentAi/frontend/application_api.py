@@ -1,16 +1,14 @@
 """Small HTTP client for authenticated application records."""
 
 import json
-<<<<<<< HEAD
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
-=======
 import logging
 import re
 import uuid
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode, urlsplit
->>>>>>> origin/development
+
 from urllib.request import Request, urlopen
 
 import streamlit as st
@@ -18,13 +16,11 @@ import streamlit as st
 from backend.core.config import SettingsError, get_api_base_url
 
 
-<<<<<<< HEAD
-=======
 # Temporary, value-free checkout diagnostics; remove after confirming the live flow.
 _payment_logger = logging.getLogger(__name__)
 
 
->>>>>>> origin/development
+
 class ApplicationAPIError(RuntimeError):
     def __init__(
         self,
@@ -60,9 +56,7 @@ def _safe_response_detail(error: HTTPError) -> str | None:
     return normalized[:240] or None
 
 
-<<<<<<< HEAD
 def request(method: str, path: str, *, payload: dict | None = None, params: dict | None = None):
-=======
 def request(
     method: str,
     path: str,
@@ -72,7 +66,7 @@ def request(
     raw_body: bytes | None = None,
     content_type: str = "application/json",
 ):
->>>>>>> origin/development
+
     token = st.session_state.get("rentai_id_token")
     if not token:
         raise ApplicationAPIError("Your session has expired. Sign in again.")
@@ -86,17 +80,11 @@ def request(
         if query:
             url += "?" + query
             request_path += "?" + query
-<<<<<<< HEAD
-    data = json.dumps(payload).encode("utf-8") if payload is not None else None
-    req = Request(url, data=data, headers={
-        "Authorization": f"Bearer {token}", "Accept": "application/json",
-        "Content-Type": "application/json",
-=======
     data = raw_body if raw_body is not None else (json.dumps(payload).encode("utf-8") if payload is not None else None)
     req = Request(url, data=data, headers={
         "Authorization": f"Bearer {token}", "Accept": "application/json",
         "Content-Type": content_type,
->>>>>>> origin/development
+
     }, method=method)
     try:
         with urlopen(req, timeout=15) as response:
@@ -110,11 +98,6 @@ def request(
             message = "Your account is not allowed to perform that action."
         elif exc.code == 401:
             message = "Your session has expired. Sign in again."
-<<<<<<< HEAD
-        if exc.code == 404:
-            if record_id:
-                message = "This record is no longer available. Refresh and try again."
-=======
         elif exc.code == 409:
             message = response_detail or "This conflicts with an existing request. Refresh and try again."
         if exc.code == 404:
@@ -122,19 +105,11 @@ def request(
                 message = "This record is no longer available. Refresh and try again."
             elif path.startswith("/bookings") and response_detail:
                 message = response_detail
->>>>>>> origin/development
+
             elif path == "/application/auth/records":
                 message = "RentAI could not find the renter records endpoint."
             elif path == "/application/auth/listing-images":
                 message = "RentAI could not find the listing images endpoint."
-<<<<<<< HEAD
-            else:
-                message = "RentAI could not find the requested API endpoint."
-        elif exc.code >= 500:
-            message = "RentAI's application service is temporarily unavailable. Please try again later."
-        elif exc.code not in {401, 403}:
-            message = "RentAI could not complete that request. Please try again."
-=======
             elif path == "/application/auth/profile-images":
                 message = "RentAI could not find the profile images endpoint."
             else:
@@ -155,7 +130,7 @@ def request(
             message = "RentAI could not complete that request. Please try again."
         if path.startswith("/application/payments/razorpay/") and response_detail and exc.code not in {401, 403}:
             message = response_detail
->>>>>>> origin/development
+
         raise ApplicationAPIError(
             message,
             status_code=exc.code,
@@ -180,10 +155,6 @@ def listing_images() -> list[dict]:
     return request("GET", "/application/auth/listing-images").get("images", [])
 
 
-<<<<<<< HEAD
-def property_approval_history() -> list[dict]:
-    return request("GET", "/application/auth/approvals").get("requests", [])
-=======
 def profile_images() -> list[dict]:
     return request("GET", "/application/auth/profile-images").get("images", [])
 
@@ -206,7 +177,7 @@ def upload_image(record_id: str, content: bytes, filename: str, mime_type: str) 
         "POST", f"/application/records/{quote(record_id, safe='')}/images",
         raw_body=body, content_type=f"multipart/form-data; boundary={boundary}",
     )
->>>>>>> origin/development
+
 
 
 def create(kind: str, data: dict) -> dict:
@@ -243,74 +214,6 @@ def set_user_role(uid: str, role: str) -> None:
     request("PUT", f"/application/admin/users/{uid}/role", payload={"role": role})
 
 
-<<<<<<< HEAD
-def admin_dashboard() -> dict:
-    return request("GET", "/application/admin/dashboard")
-
-
-def admin_records(kind: str | None = None) -> list[dict]:
-    return request("GET", "/application/admin/records", params={"kind": kind}).get("records", [])
-
-
-def admin_approvals(status: str | None = None) -> list[dict]:
-    return request("GET", "/application/admin/approvals", params={"status": status}).get("requests", [])
-
-
-def review_property(property_id: str, status: str, notes: str = "") -> None:
-    request("POST", f"/application/admin/properties/{property_id}/review", payload={"status": status, "notes": notes})
-
-
-def set_user_status(uid: str, status: str) -> None:
-    request("PUT", f"/application/admin/users/{uid}/status", payload={"status": status})
-
-
-def app_reviews(*, rating: int | None = None, role: str | None = None, search: str | None = None) -> dict:
-    return request("GET", "/application/auth/app-reviews", params={
-        "rating": rating, "role": role, "search": search,
-    })
-
-
-def submit_app_review(rating: int, feedback: str) -> dict:
-    return request("PUT", "/application/auth/app-reviews", payload={
-        "rating": rating, "feedback": feedback,
-    })
-
-
-def update_rental_request(record_id: str, status: str, note: str = "") -> None:
-    request("PUT", f"/application/admin/rental-requests/{record_id}", payload={"status": status, "note": note})
-
-
-def support_tickets() -> list[dict]:
-    return request("GET", "/application/auth/support").get("tickets", [])
-
-
-def create_support_ticket(subject: str, description: str, priority: str = "normal") -> dict:
-    return request("POST", "/application/auth/support", payload={
-        "subject": subject, "description": description, "priority": priority,
-    })
-
-
-def update_support_ticket(ticket_id: str, status: str, admin_response: str) -> None:
-    request("PUT", f"/application/admin/support/{ticket_id}", payload={
-        "status": status, "admin_response": admin_response,
-    })
-
-
-def admin_activity() -> list[dict]:
-    return request("GET", "/application/admin/activity").get("activity", [])
-
-
-def admin_analytics() -> dict:
-    return request("GET", "/application/admin/analytics")
-
-
-def admin_predictions() -> list[dict]:
-    return request("GET", "/application/admin/predictions").get("predictions", [])
-
-
-def admin_test_prediction(features: dict) -> dict:
-    return request("POST", "/application/admin/predictions", payload=features)
-=======
 def bookings() -> list[dict]:
     return request("GET", "/bookings").get("bookings", [])
 
@@ -430,4 +333,4 @@ def similar_properties_for_features(features: dict, limit: int = 5) -> list[dict
     if not isinstance(properties, list) or any(not isinstance(item, dict) for item in properties):
         raise ApplicationAPIError("RentAI returned invalid comparable properties.")
     return properties
->>>>>>> origin/development
+

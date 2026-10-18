@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 """SQLite-backed Admin console and its role-protected management sections."""
 
 from datetime import datetime, timezone
@@ -934,7 +933,6 @@ def render_user_support(_data=None) -> None:
 
 def render_support_page(_data=None) -> None:
     render_support(admin=st.session_state.get("rentai_role") == "admin")
-=======
 """Dataset administration and downloadable status report."""
 
 from datetime import datetime, timezone
@@ -1006,4 +1004,4 @@ def render(data: pd.DataFrame) -> None:
 				st.rerun()
 	except ApplicationAPIError as exc:
 		st.error(str(exc))
->>>>>>> origin/development
+

@@ -32,7 +32,6 @@ html, body {
 	color: var(--rentai-ink);
 }
 
-<<<<<<< HEAD
 /* Keep long pages scrollable in Streamlit's main pane; the sidebar is a sibling pane. */
 [data-testid="stMain"] {
 	min-height: 100vh;
@@ -40,8 +39,7 @@ html, body {
 	overscroll-behavior-y: contain;
 }
 
-=======
->>>>>>> origin/development
+
 [data-testid="stMainBlockContainer"] h1,
 [data-testid="stMainBlockContainer"] h2,
 [data-testid="stMainBlockContainer"] h3,
@@ -55,8 +53,6 @@ html, body {
 	color: var(--rentai-muted) !important;
 }
 
-<<<<<<< HEAD
-=======
 [data-testid="stMainBlockContainer"] [data-testid="stExpander"] {
 	background: var(--rentai-card);
 	border: 1px solid var(--rentai-border);
@@ -68,7 +64,7 @@ html, body {
 	color: var(--rentai-ink) !important;
 }
 
->>>>>>> origin/development
+
 [data-testid="stMainBlockContainer"] h1,
 [data-testid="stMainBlockContainer"] h2,
 [data-testid="stMainBlockContainer"] h3 {
@@ -160,7 +156,6 @@ h3 { font-size: 1rem; font-weight: 700; }
 	box-shadow: 0 3px 14px rgba(15, 23, 42, .035);
 }
 
-<<<<<<< HEAD
 /* Keep five Admin metrics per desktop row, then reflow without narrowing text. */
 [data-testid="stHorizontalBlock"]:has([class*="st-key-admin_metric_card_"]) {
 	display: grid !important;
@@ -431,8 +426,7 @@ body:has([class*="st-key-admin_user_detail_all"] [aria-expanded="true"]) [data-b
 	color: #c45108 !important;
 }
 
-=======
->>>>>>> origin/development
+
 [data-testid="stMetric"] {
 	padding: .15rem 0;
 }
@@ -499,7 +493,6 @@ body:has([class*="st-key-admin_user_detail_all"] [aria-expanded="true"]) [data-b
 	box-shadow: 0 5px 12px rgba(15, 23, 42, .12);
 }
 
-<<<<<<< HEAD
 /* Four live Analytics cards: responsive 4/2/1 grid, with the keyed
    Streamlit container's visible border as the hover target. */
 [data-testid="stHorizontalBlock"]:has([class*="st-key-admin_analytics_card_"]) {
@@ -738,8 +731,7 @@ body:has([class*="st-key-admin_user_detail_all"] [aria-expanded="true"]) [data-b
 	}
 }
 
-=======
->>>>>>> origin/development
+
 [data-testid="stTextInput"] input,
 [data-testid="stNumberInput"] input,
 [data-testid="stSelectbox"] [data-baseweb="select"] > div {
@@ -824,7 +816,6 @@ body:has([class*="st-key-admin_user_detail_all"] [aria-expanded="true"]) [data-b
 	color: var(--rentai-orange);
 }
 
-<<<<<<< HEAD
 /* Admin App Reviews: soft orange surface for the recent review list only. */
 [data-testid="stMainBlockContainer"] [class*="st-key-admin_app_reviews_recent"] {
 	box-sizing: border-box;
@@ -841,16 +832,13 @@ body:has([class*="st-key-admin_user_detail_all"] [aria-expanded="true"]) [data-b
 	color: #17243a !important;
 }
 
-=======
->>>>>>> origin/development
+
 [data-testid="stAlert"] {
 	border-radius: 8px;
 	background: var(--rentai-card);
 	border-color: var(--rentai-border);
 }
 
-<<<<<<< HEAD
-=======
 div[class*="st-key-rentai-property-photo-"] [data-testid="stImage"] img {
 	width: 100%;
 	height: 100%;
@@ -875,13 +863,12 @@ div[class*="st-key-rentai-property-photo-"] .renter-property-placeholder {
 	font-size: .9rem;
 }
 
->>>>>>> origin/development
+
 @media (max-width: 850px) {
 	[data-testid="stMainBlockContainer"] {
 		padding: 1rem .8rem 2rem;
 	}
 }
-<<<<<<< HEAD
 
 /* Property Approval Requests: page-scoped table styling. */
 [data-testid="stMainBlockContainer"] .rentai-approval-section-title {
@@ -1154,5 +1141,4 @@ body:has([class*="st-key-admin_user_detail_owner"] [aria-expanded="true"]) [data
 	padding-top: .55rem;
 	background: var(--rentai-navy);
 }
-=======
->>>>>>> origin/development
+

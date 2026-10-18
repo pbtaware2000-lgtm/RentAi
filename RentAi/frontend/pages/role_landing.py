@@ -27,10 +27,10 @@ def render() -> None:
         """
         <style>
         [data-testid="stAppViewContainer"] { background: #090b0e; }
-<<<<<<< HEAD
-=======
         [data-testid="stSidebar"] { display: none; }
->>>>>>> origin/development
+
+        [data-testid="stSidebar"] { display: none; }
+
         [data-testid="stMain"] { align-items: flex-start !important; }
         [data-testid="stMainBlockContainer"] {
           width: 100%; max-width: 960px; padding-top: 2.2rem; color: #f4f5f6;
@@ -106,8 +106,8 @@ def render() -> None:
                         width="stretch",
                         on_click=_select_role,
                         args=(role,),
-<<<<<<< HEAD
                     )
-=======
                     )
->>>>>>> origin/development
+
+                    )
+
