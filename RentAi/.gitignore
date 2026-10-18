@@ -13,3 +13,9 @@ __pycache__/
 =======
 
 >>>>>>> origin/development
+.venv/
+venv/
+**/.venv/
+**/venv/
+.env
+__pycache__/
